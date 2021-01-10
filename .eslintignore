@@ -1,0 +1,15 @@
+!**/.eslintrc*
+node_modules*
+*.html
+dist
+*.svg
+*.ico
+*.json
+.vscode*
+.gitignore
+*.md
+*.log
+*.lock
+*.vue
+store*
+*.js

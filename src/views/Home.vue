@@ -1,18 +1,23 @@
 <template>
   <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png" />
-    <HelloWorld msg="Welcome to Your Vue.js App" />
+    <h1>{{prices.bitcoin}}</h1>
+    <input type="text" ref="yeet">
+    <button @click="$store.dispatch('WATCH_COIN', $refs.yeet.value)">add</button>
   </div>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from "@/components/HelloWorld.vue";
-
+import { mapGetters } from 'vuex';
 export default {
-  name: "Home",
-  components: {
-    HelloWorld
-  }
+    name: 'Home',
+    components: {},
+    data() {
+        return {
+            prices: this.getPrices(),
+        };
+    },
+    methods: {
+        ...mapGetters(['getPrices']),
+    },
 };
 </script>

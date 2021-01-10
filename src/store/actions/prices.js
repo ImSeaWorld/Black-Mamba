@@ -1,0 +1,9 @@
+export const CLOSED = 'CLOSED';
+export const CONNECT = 'CONNECT';
+export const UPDATED = 'UPDATED';
+export const CONNECTED = 'CONNECTED';
+export const CONNECTING = 'CONNECTING';
+export const DISCONNECT = 'DISCONNECT';
+export const WATCH_COIN = 'WATCH_COIN';
+export const DISCONNECTED = 'DISCONNECTED';
+export const UPDATE_PRICE = 'UPDATE_PRICE';
