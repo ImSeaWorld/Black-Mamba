@@ -1,32 +1,117 @@
 <template>
   <q-layout view="hHh lpR fFf">
+      
+    <q-overlay v-model="!login.loggedin" cursor-type="default" no-scroll z-index="5000">
+        <template v-slot:body>
+            <div class="fullscreen row justify-center items-center">
+                <q-spinner v-if="login.loading" color="yellow" size="3em"></q-spinner>
+                <q-card style="width: 420px;" :dark="false" v-else>
+                    <q-card-section class="text-black text-center text-h5">
+                        Login to NameBase
+                    </q-card-section>
+                    <q-tabs
+                        :dark="false"
+                        align="justify"
+                        v-model="login.tab"
+                        class="text-grey"
+                        active-color="primary"
+                        indicator-color="primary"
+                    >
+                        <q-tab name="session" label="Session" />
+                        <q-tab name="local" label="Email/Pass" disable />
+                    </q-tabs>
+                    <q-separator />
+                    <q-tab-panels animated v-model="login.tab" :dark="false">
+                        <q-tab-panel name="session">
+                            <q-form ref="session">
+                                <q-input 
+                                    filled 
+                                    :dark="false"
+                                    label="Session"
+                                    type="password"
+                                    v-model="login.session"
+                                    class="q-mb-sm"
+                                    hint="Namebase session stored in your browser"
+                                    :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                />
+                                    <q-checkbox :dark="false" class="text-grey-7" style="font-size: 1.2rem;user-select: none;" v-model="login.remember" label="Memba Me" />
+                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="$store.dispatch(login.remember ? 'REMEMBER_LOGIN' : 'LOGIN', login.session)"></q-btn>
+                            </q-form>
+                        </q-tab-panel>
+                        <q-tab-panel name="local">
+                            <q-form ref="login">
+                                <q-input 
+                                    filled 
+                                    :dark="false"
+                                    label="Email" 
+                                    hint="Your email stupid..." 
+                                    :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                />
 
-    <q-header elevated class="bg-dark text-white" height-hint="98">
-        <q-toolbar style="-webkit-app-region: drag;margin: 2px;">
-            <!--q-btn dense flat round icon="mdi-menu" @click="left = !left" /-->
+                                <q-input 
+                                    filled 
+                                    :dark="false" 
+                                    class="q-my-sm"
+                                    label="Password" 
+                                    hint="Your password stoopid..."
+                                    type="password"
+                                    :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                />
+
+                                <q-input 
+                                    filled 
+                                    :dark="false" 
+                                    class="q-my-sm"
+                                    label="2FA" 
+                                    hint="Your 2fa stewpid..."
+                                    :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                />
+                                
+                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="login.loggedin = !login.loggedin"></q-btn>
+
+                            </q-form>
+                        </q-tab-panel>
+                    </q-tab-panels>
+                </q-card>
+            </div>
+        </template>
+    </q-overlay>
+
+    <q-header elevated class="bg-dark text-white" height-hint="98" style="z-index: 5001;">
+        <q-toolbar style="-webkit-app-region: drag;margin: 2px;" >
+
             <q-avatar>
                 <img src="./assets/logo.png">
             </q-avatar>
 
             <q-toolbar-title>Black Mamba</q-toolbar-title>
 
-            <q-btn dense flat round icon="mdi-bell" @click="right = !right" style="-webkit-app-region: no-drag" />
-            <q-btn flat dense icon="mdi-window-minimize" style="-webkit-app-region: no-drag" />
-            <q-btn flat dense :icon="`mdi-window-${app.maximized ? 'restore' : 'maximize'}`" style="-webkit-app-region: no-drag" />
-            <q-btn flat dense icon="mdi-close" style="-webkit-app-region: no-drag" />
+            <q-btn dense flat round icon="mdi-bell" size="md" @click="right = !right" style="-webkit-app-region: no-drag;" :style="!login.loggedin ? 'display: none;' : ''" disable>
+                <!--q-badge floating transparent color="negative" style="font-size: 0.7rem;">12</q-badge-->
+            </q-btn>
+            <q-btn flat dense icon="mdi-reload" @click="app.win.reload()" style="-webkit-app-region: no-drag" />
+            <q-btn flat dense icon="mdi-window-minimize" @click="app.win.minimize()" style="-webkit-app-region: no-drag" />
+            <q-btn flat dense :icon="`mdi-window-${app.maximized ? 'restore' : 'maximize'}`" @click="() => {if(app.maximized) app.win.unmaximize(); else app.win.maximize();}" style="-webkit-app-region: no-drag" />
+            <q-btn flat dense icon="mdi-close" @click="app.win.destroy()" style="-webkit-app-region: no-drag" />
         </q-toolbar>
 
         <q-tabs align="left">
-            <q-route-tab to="/" label="My Domains" />
-            <q-route-tab to="/about" label="Auctions" />
-            <q-route-tab to="/page4" label="The Boyses" />
-            <q-route-tab to="/page5" label="The Coin Aye" />
-            <q-route-tab to="/page3" label="Log" />
+            <q-route-tab to="/" label="My Domains" :disable="!login.loggedin">
+                <q-badge floating v-if="domainsLength > 0">{{domainsLength}}</q-badge>
+            </q-route-tab>
+            <q-route-tab to="/marketplace" label="Marketplace" :disable="!login.loggedin" />
+            <q-route-tab to="/auctions" label="Auctions" :disable="!login.loggedin">
+                <q-badge color="dark" floating>
+                    <span class="text-blue-6" style="padding-right: 3px;font-weight: bold;">{{namebaseBids.open.length}}</span>
+                    <span class="text-orange" style="padding: 0 3px;font-weight: bold;">{{namebaseBids.revealing.length}}</span>
+                    <span class="text-red" style="padding-left: 3px;font-weight: bold;">{{namebaseBids.lost.length}}</span>
+                </q-badge>
+            </q-route-tab>
+            <q-route-tab to="/boyses" label="The Boyses" :disable="!login.loggedin" />
+            <q-route-tab to="/coin" label="The Coin Aye" :disable="!login.loggedin" />
+            <q-route-tab to="/log" label="Log" :disable="!login.loggedin" />
         </q-tabs>
     </q-header>
-
-    <!--q-drawer show-if-above v-model="left" side="left" bordered>
-    </q-drawer-->
 
     <q-drawer v-model="right" side="right" bordered>
         <div class="q-pa-md">
@@ -45,7 +130,9 @@
                                         <q-item-label style="user-select:none;" caption>{{ noto.date | moment('from', 'now') }}</q-item-label>
                                     </q-item-section>
                                 </q-item>
+                                
                             </q-item-section>
+
                         </template>
 
                         <q-card>
@@ -71,14 +158,63 @@
         </div>
     </q-drawer>
 
-    <q-page-container>
-        <router-view />
+    <q-page-container class="absolute-full">
+        <q-scroll-area style="height: 100%; max-width: 100vw;" visible>
+            <router-view />
+        </q-scroll-area>
     </q-page-container>
 
     <q-footer elevated class="bg-dark text-white">
         <q-toolbar>
-            <q-item-section>
-                Balance: 0.43 HNS | Locked 1,395.32 HNS
+            <q-item-section v-if="account.hnsBalance > -1 && account.lockedHns > -1">
+                <table style="width: 75px;white-space: nowrap;">
+                    <col style="width: 1px;white-space: nowrap;">
+                    <col style="width: 50px;white-space: nowrap;">
+                    <col style="width: 50px;white-space: nowrap;">
+                    <tbody>
+                        <tr>
+                            <td style="text-align: right;color: #757575;">Balance: </td>
+                            <td style="text-align: right;padding: 0 10px;">{{formatdd2hns(account.hnsBalance)}} HNS </td>
+                            <td style="text-align: right;color: #757575;" v-if="prices.handshake">{{formatCurrency('USD', dd2hns(account.hnsBalance) * prices.handshake)}}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: right;color: #757575;">Locked: </td>
+                            <td style="text-align: right;padding: 0 10px;">{{formatdd2hns(account.lockedHns)}} HNS </td>
+                            <td style="text-align: right;color: #757575;" v-if="prices.handshake">{{formatCurrency('USD', dd2hns(account.lockedHns) * prices.handshake)}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </q-item-section>
+            <q-item-section v-else>
+                <table style="width: 75px;white-space: nowrap;">
+                    <col style="width: 1px;white-space: nowrap;">
+                    <col style="width: 50px;white-space: nowrap;">
+                    <col style="width: 50px;white-space: nowrap;">
+                    <tbody>
+                        <tr>
+                            <td style="text-align: right;color: #757575;">
+                                <q-skeleton animation="blink" type="text" width="56px" />
+                            </td>
+                            <td style="text-align: right;padding: 0 10px;">
+                                <q-skeleton animation="blink" type="text" width="136px" />
+                            </td>
+                            <td style="text-align: right;color: #757575;">
+                                <q-skeleton animation="blink" type="text" width="53px" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: right;color: #757575;">
+                                <q-skeleton animation="blink" type="text" width="56px" />
+                            </td>
+                            <td style="text-align: right;padding: 0 10px;">
+                                <q-skeleton animation="blink" type="text" width="136px" />
+                            </td>
+                            <td style="text-align: right;color: #757575;">
+                                <q-skeleton animation="blink" type="text" width="53px" />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </q-item-section>
 
             <template v-for="(price, i) in prices">
@@ -87,24 +223,6 @@
                         {{i}}: <span style="color: #21BA45;display: inline-block;">${{ price }}</span>
                     </q-item-label>
                 </q-item-section>
-
-                <!--q-item-section side>
-                    <q-item-label style="user-select:none;">
-                        HNS: <span style="color: #21BA45;display: inline-block;">${{ prices.handshake }}</span>
-                    </q-item-label>
-                </q-item-section>
-
-                <q-item-section side>
-                    <q-item-label style="user-select:none;">
-                        ETH: <span style="color: #21BA45;display: inline-block;">${{ prices.ethereum }}</span>
-                    </q-item-label>
-                </q-item-section>
-
-                <q-item-section side>
-                    <q-item-label style="user-select:none;">
-                        XLM: <span style="color: #21BA45;display: inline-block;">${{ prices.stellar }}</span>
-                    </q-item-label>
-                </q-item-section-->
             </template>
         </q-toolbar>
 
@@ -115,15 +233,27 @@
 
 <script>
 import moment from 'moment';
+import punycode from 'punycode';
 import { remote } from 'electron';
-import { mapMutations, mapGetters } from 'vuex';
+import { mapMutations, mapGetters, mapState } from 'vuex';
 
 export default {
     data() {
         return {
+            login: {
+                loading: true,
+                loggedin: false,
+                remember: false,
+                email: '',
+                password: '',
+                _2fa: '',
+                session: false,
+                tab: 'session',
+            },
             app: {
                 win: remote.getCurrentWindow(),
                 maximized: false,
+                namebaseLoop: false,
             },
             prices: {},
             ws: {
@@ -132,6 +262,11 @@ export default {
             left: false,
             right: false,
             expanded: false,
+            account: {
+                lockedHns: -1,
+                hnsBalance: -1,
+                usdBalance: -1,
+            },
             notifications: [
                 {
                     type: 1,
@@ -165,32 +300,83 @@ export default {
         };
     },
     methods: {
-        ...mapGetters(['getConnection', 'getPrices', 'getCoins']),
+        ...mapGetters([
+            'getConnection',
+            'getCoinPrices',
+            'getCoins',
+            'usdBalance',
+            'hnsBalance',
+            'lockedHns',
+            'height',
+            'session',
+            'namebaseStatus',
+        ]),
+        closeApplication() {
+            this.app.win.destroy();
+        },
+    },
+    computed: {
+        ...mapGetters(['namebaseBids', 'domainsLength']),
+        activeSession() {
+            return this.session();
+        },
+        clockedHns() {
+            return this.lockedHns();
+        },
+        chnsBalance() {
+            return this.hnsBalance();
+        },
+        cusdBalance() {
+            return this.usdBalance();
+        },
+        nbStatus() {
+            return this.namebaseStatus();
+        },
+    },
+    watch: {
+        activeSession(to) {
+            this.login.session = to;
+            this.login.loggedin = !!to;
+        },
+        clockedHns(to, fro) {
+            this.account.lockedHns = to;
+        },
+        chnsBalance(to, fro) {
+            this.account.hnsBalance = to;
+        },
+        cusdBalance(to, fro) {
+            this.account.usdBalance = to;
+        },
+        nbStatus(to) {
+            if (this.login.loading) {
+                switch (to) {
+                    case 'LOGGED_IN':
+                    case 'FAILED_LOGIN':
+                    case 'NOT_LOGGED_IN': {
+                        this.login.loading = false;
+                    }
+                }
+            }
+        },
+        'login.loading'(to) {
+            if (!to && this.login.loggedin) {
+                this.app.namebaseLoop = setInterval(() => {
+                    this.$store.dispatch('GET_DOMAINS');
+                    this.$store.dispatch('UPDATE_INFO');
+                }, 30000);
+            }
+        },
+    },
+    beforeDestroy() {
+        clearInterval(this.app.namebaseLoop);
     },
     created() {
-        this.$store.dispatch('CONNECT');
-        /*this.ws.connection = new WebSocket(
-            'wss://ws.coincap.io/prices?assets=handshake,bitcoin,ethereum,stellar',
-        );
-        this.ws.connection.onopen = (event) => {
-            //console.log(event);
-        };
-
-        this.ws.connection.onmessage = (event) => {
-            //console.log(event);
-            var data = JSON.parse(event.data);
-
-            for (var coin in data) {
-                this.$store.dispatch('UPDATE_PRICE', {
-                    coin: coin,
-                    price: data[coin],
-                });
-                //this.prices[coin] = data[coin];
-            }
-        };*/
+        this.$store.dispatch('LOAD_SAVE');
     },
     beforeMount() {
-        this.prices = this.getPrices();
+        this.login.loggedin = !!this.session();
+        this.prices = this.getCoinPrices();
+
         this.app.win.on('maximize', () => {
             this.app.maximized = true;
         });
@@ -199,9 +385,21 @@ export default {
             this.app.maximized = false;
         });
     },
+    mounted() {
+        this.account.lockedHns = this.clockedHns;
+        this.account.hnsBalance = this.chnsBalance;
+        this.account.usdBalance = this.cusdBalance;
+    },
     beforeDestroy() {
+        this.$store.dispatch('DISCONNECT');
         window.removeEventListener('maximize', () => {});
         window.removeEventListener('unmaximize', () => {});
     },
 };
 </script>
+
+<style lang="scss">
+body {
+    overflow: hidden;
+}
+</style>

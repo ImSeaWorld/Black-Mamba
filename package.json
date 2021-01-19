@@ -9,11 +9,14 @@
     "electron:build": "vue-cli-service electron:build",
     "electron:serve": "vue-cli-service electron:serve",
     "postinstall": "electron-builder install-app-deps",
-    "postuninstall": "electron-builder install-app-deps"
+    "postuninstall": "electron-builder install-app-deps",
+    "start": "npm run electron:serve",
+    "packageWin": "electron-packager . black-mamba --overwrite --asar=true --platform=win32 --arch=ia32 --prune=true --out=release-builds --version-string.CompanyName=CE --version-string.FileDescription=CE --icon=src/assets/icon.ico --version-string.ProductName=\"Black Mamba\""
   },
   "main": "background.js",
   "dependencies": {
     "@quasar/extras": "^1.0.0",
+    "@quasar/quasar-ui-qoverlay": "^1.0.5",
     "coincapjs": "^1.0.5",
     "core-js": "^3.6.5",
     "namebasejs": "file:../../NamebaseJS",

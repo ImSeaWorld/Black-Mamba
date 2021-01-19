@@ -1,9 +1,12 @@
 export const LOGIN = 'LOGIN';
+export const GET_BIDS = 'GET_BIDS';
 export const GET_DOMAINS = 'GET_DOMAINS';
 export const UPDATE_INFO = 'UPDATE_INFO';
 export const GET_DASHBOARD = 'GET_DASHBOARD';
 export const UPDATE_BALANCE = 'UPDATE_BALANCE';
 
+export const FINISHED = 'FINISHED';
+export const SET_BIDS = 'SET_BIDS';
 export const LOGGED_IN = 'LOGGED_IN';
 export const SET_HEIGHT = 'SET_HEIGHT';
 export const SET_BALANCE = 'SET_BALANCE';
@@ -12,4 +15,5 @@ export const FAILED_LOGIN = 'FAILED_LOGIN';
 export const SERVER_ERROR = 'SERVER_ERROR';
 export const NOT_LOGGED_IN = 'NOT_LOGGED_IN';
 export const SET_LOCKEDHNS = 'SET_LOCKEDHNS';
+export const SET_TABLE_STATE = 'SET_TABLE_STATE';
 export const SESSION_EXPIRED = 'SESSION_EXPIRED';

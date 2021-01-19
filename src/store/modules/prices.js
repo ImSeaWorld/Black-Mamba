@@ -11,34 +11,40 @@ import {
     DISCONNECTED,
 } from '../actions/prices';
 
-const state = { status: 'N/A', prices: {}, coins: [], wsConnection: undefined };
+const state = {
+    prices: {
+        coins: [],
+        prices: {},
+        status: 'N/A',
+        lasttimestamp: false,
+        wsConnection: undefined,
+    },
+};
 
 const getters = {
-    getCoins: (state) => state.coins,
+    getCoins: (state) => state.prices.coins,
+    getCoinPrices: (state) => state.prices.prices,
     getPrices: (state) => state.prices,
-    getConnection: (state) => state.wsConnection,
+    priceStatus: (state) => state.prices.status,
+    getConnection: (state) => state.prices.wsConnection,
 };
 
 const actions = {
     [CONNECT]: ({ commit, dispatch, getters }) => {
         commit(CONNECTING);
 
-        var connection = getters.getConnection;
-        if (!connection) {
-            var coins = getters.getCoins;
-            connection = new WebSocket(
-                'wss://ws.coincap.io/prices?assets=bitcoin,handshake' +
-                    (coins.length > 0 ? ',' : '') +
-                    [...coins].join(','),
-            );
-        }
+        var coins = getters.getCoins;
+        var connection = new WebSocket(
+            'wss://ws.coincap.io/prices?assets=bitcoin,handshake' +
+                (coins.length > 0 ? ',' : '') +
+                [...coins].join(','),
+        );
 
         connection.onopen = () => {
             commit(CONNECTED, connection);
         };
 
         connection.onclose = (event) => {
-            console.error(event);
             commit(CLOSED);
         };
 
@@ -53,8 +59,7 @@ const actions = {
             }
         };
     },
-    [DISCONNECT]: ({ commit, getters }) => {
-        getters.getConnection.close();
+    [DISCONNECT]: ({ commit }) => {
         commit(DISCONNECTED);
     },
     [WATCH_COIN]: ({ commit, dispatch }, id) => {
@@ -69,26 +74,26 @@ const actions = {
 
 const mutations = {
     [CONNECTED]: (state, connection) => {
-        state.status = 'connected';
-        state.wsConnection = connection;
+        state.prices.status = 'connected';
+        state.prices.wsConnection = connection;
     },
     [CONNECTING]: (state) => {
-        state.status = 'connecting';
+        state.prices.status = 'connecting';
     },
     [DISCONNECTED]: (state) => {
-        state.status = 'disconnected';
-        state.wsConnection = false;
+        state.prices.wsConnection.close();
     },
     [CLOSED]: (state) => {
-        state.status = 'closed';
+        state.prices.status = 'closed';
     },
     [WATCH_COIN]: (state, coin) => {
-        state.status = 'adding-watcher';
-        Vue.set(state.coins, state.coins.length, coin);
+        state.prices.status = 'adding-watcher';
+        Vue.set(state.prices.coins, state.prices.coins.length, coin);
     },
     [UPDATED]: (state, { coin, price }) => {
-        state.status = 'updated';
-        Vue.set(state.prices, coin, price);
+        state.prices.status = 'updated';
+        Vue.set(state.prices.prices, coin, price);
+        state.prices.lasttimestamp = new Date().getTime();
     },
 };
 

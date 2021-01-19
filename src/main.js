@@ -40,11 +40,50 @@ Vue.mixin({
                 }).format(dollar);
             };
         },
+        numberWithCommas() {
+            return (x) =>
+                x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ',');
+        },
+        formatdd2hns() {
+            return (dd) => {
+                var numberWithCommas = (x) => {
+                    return x
+                        .toString()
+                        .replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ',');
+                };
+                return numberWithCommas((dd / 1000000).toFixed(6));
+            };
+        },
         dd2hns() {
-            return (dd) => dd / 1000000;
+            return (dd) => {
+                if (!dd) return undefined;
+                return (dd / 1000000).toFixed(6);
+            };
         },
         hns2dd() {
             return (hns) => hns * 1000000;
+        },
+        excludeProperty() {
+            return (a, k) => {
+                var o = {};
+                if (!a) return o;
+                for (var i in a) {
+                    if (i === k) continue;
+                    o[i] = a[i];
+                }
+                return o;
+            };
+        },
+        excludeIndex() {
+            return (a, i) => {
+                let o = [];
+                if (i === -1 || !i) return a;
+                for (var x in a) {
+                    if (i == x) continue;
+                    o.push(a[x]);
+                }
+                return o;
+            };
         },
     },
     methods: {
