@@ -24,6 +24,7 @@ import {
     SET_SEARCH_STATE,
 } from '../actions/namebase';
 import { CONNECT } from '../actions/prices';
+import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 
 const state = {
     namebase: {
@@ -280,16 +281,29 @@ const actions = {
             }
         });
     },
-    [DOMAIN_SEARCH]: ({ commit, getters }, domain) => {
+    [DOMAIN_SEARCH]: ({ commit, getters }, { domain, progress }) => {
         var instance = getters.namebase;
         if (!instance) {
             return commit(NOT_LOGGED_IN);
         }
 
+        // sanitize domain further
+        // Removes the following: !@#$%^&*()+`~:;'"[]}{\/|?,<>
+        // Cannot lead with underscore, but underscores are legal
+        // Cannot be 2 numbers, but multiple numbers is legal
+        domain = domain
+            .replace(/[\s.\n\r{}()=+*&^%$#@!`~:;'"\[\]\\/|?,<>]/g, '')
+            .toLowerCase();
+
         instance.domains().auction(domain, (err, status, result) => {
             var dna = false;
             if (err) {
                 console.error(status, err);
+            }
+
+            if (result.invalidName) {
+                dna = true;
+                console.error('Invalid Name: ', domain);
             }
 
             if (result.reserved) {
@@ -313,14 +327,28 @@ const actions = {
             if (!dna) {
                 commit(SET_SEARCH_STATE, { released: result });
             }
+
+            if (progress > getters.namebaseSearch.progress) {
+                commit(SET_SEARCH_STATE, { progress: progress });
+                if (progress >= 1) {
+                    setTimeout(() => {
+                        commit(SET_SEARCH_STATE, { progress: 0 });
+                    }, 6500);
+                }
+            }
         });
     },
     [POWER_SEARCH]: ({ commit, dispatch }, list) => {
         var nlist = list.replace(/^\s*$(?:\r\n?|\n)/gm, '').split('\n');
         commit(SET_SEARCH_STATE, { list: nlist, loading: true });
 
+        let i = 0;
         for (var key in nlist) {
-            dispatch(DOMAIN_SEARCH, nlist[key]);
+            dispatch(DOMAIN_SEARCH, {
+                domain: nlist[key],
+                progress: ++i / nlist.length,
+            });
+            console.log(i);
         }
 
         commit(SET_SEARCH_STATE, { loading: false });
@@ -346,12 +374,6 @@ const mutations = {
                 );
 
                 console.log(search[k], index);
-
-                /*if (index == -1) {
-                    Vue.set(state.namebase.search[k],
-                        state.namebase.search[k].length,
-                        search[k]);
-                }*/
 
                 Vue.set(
                     state.namebase.search[k],
@@ -450,17 +472,15 @@ const mutations = {
     [SET_BIDS]: (state, { type, list }) => {
         state.namebase.status = SET_BIDS;
         for (var domain in list) {
-            if (
-                !state.namebase.bids[type].find(
-                    (e) => e.domain === list[domain].domain,
-                )
-            ) {
-                Vue.set(
-                    state.namebase.bids[type],
-                    state.namebase.bids[type].length,
-                    list[domain],
-                );
-            }
+            var index = state.namebase.bids[type].findIndex(
+                (e) => e.domain === list[domain].domain,
+            );
+
+            Vue.set(
+                state.namebase.bids[type],
+                index >= 0 ? index : state.namebase.bids[type].length,
+                list[domain],
+            );
         }
         state.namebase.lasttimestamp = new Date().getTime();
         state.namebase.status = FINISHED;

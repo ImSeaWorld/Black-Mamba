@@ -219,7 +219,7 @@
 
             <template v-for="(price, i) in prices">
                 <q-item-section side>
-                    <q-item-label style="user-select:none;">
+                    <q-item-label>
                         {{i}}: <span style="color: #21BA45;display: inline-block;">${{ price }}</span>
                     </q-item-label>
                 </q-item-section>
@@ -356,12 +356,22 @@ export default {
             }
         },
         'login.loading'(to) {
-            console.log(to);
+            console.log(to, this.login.loggedin);
             if (!to && this.login.loggedin) {
                 this.app.namebaseLoop = setInterval(() => {
-                    this.$store.dispatch('GET_DOMAINS');
+                    console.log(this.$route.name);
+
+                    if (this.$route.name != 'Auctions') {
+                        this.$store.dispatch('GET_BIDS');
+                    }
+
+                    if (this.$route.name != 'Home') {
+                        this.$store.dispatch('GET_DOMAINS');
+                    }
+
                     this.$store.dispatch('UPDATE_INFO');
                 }, 30000);
+                console.log(this.app.namebaseLoop);
             }
         },
     },

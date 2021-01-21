@@ -254,9 +254,9 @@ export default {
                 this.reactive.table = 'revealing';
             }
         }
-        /*this.reactive.reloadInterval = setInterval(() => {
+        this.reactive.reloadInterval = setInterval(() => {
             this.$store.dispatch('GET_BIDS');
-        }, 100000);*/
+        }, 15000);
     },
     beforeDestroy() {
         clearInterval(this.reactive.reloadInterval);

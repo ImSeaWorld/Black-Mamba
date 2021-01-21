@@ -98,17 +98,17 @@
                     color="blue-6"
                     square
                     filled
-                    :loading="form.loading"
-                    @keyup.ctrl.enter="!form.loading ? $store.dispatch('POWER_SEARCH', form.powerSearch) : undefined"
+                    :loading="nbs.loading"
+                    @keyup.ctrl.enter="!nbs.loading ? $store.dispatch('POWER_SEARCH', form.powerSearch) : undefined"
                 />
             </div>
             <div class="row q-my-sm justify-left">
-                <q-btn label="Search" color="primary" @click="$store.dispatch('POWER_SEARCH', form.powerSearch)" :disable="form.loading" />
+                <q-btn label="Search" color="primary" @click="$store.dispatch('POWER_SEARCH', form.powerSearch)" :disable="nbs.loading" />
             </div>
         </div>
 
         <div class="row justify-center" style="width: 100%;">
-            <q-linear-progress :value="form.progress" class="q-mt-md" v-if="form.progress != 0 || form.progrss < 1" />
+            <q-linear-progress track-color="dark" :value="nbs.progress" class="q-mt-md" />
 
             <q-table
                 dark
@@ -430,10 +430,14 @@ export default {
             },
             form: {
                 loading: false,
-                progress: 0,
                 powerSearch: '',
             },
         };
+    },
+    computed: {
+        nbs() {
+            return this.namebaseSearch();
+        },
     },
     mounted() {
         var searchCache = this.namebaseSearch();
@@ -442,9 +446,51 @@ export default {
         this.result.reserved = searchCache.reserved;
         this.result.released = searchCache.released;
         this.result.unreleased = searchCache.unreleased;
+        this.form.progress = searchCache.progress;
+    },
+    watch: {
+        'result.open'(to) {
+            this.removeExistingSearch(to);
+        },
+        'result.claimed'(to) {
+            this.removeExistingSearch(to);
+        },
+        'result.reserved'(to) {
+            this.removeExistingSearch(to);
+        },
+        'result.released'(to) {
+            this.removeExistingSearch(to);
+        },
+        'result.unreleased'(to) {
+            this.removeExistingSearch(to);
+        },
     },
     methods: {
         ...mapGetters(['namebase', 'namebaseSearch']),
+        removeExistingSearch(to) {
+            let sList = this.form.powerSearch
+                .replace(/^\s*$(?:\r\n?|\n)/gm, '')
+                .split('\n');
+            for (var k in sList) {
+                if (
+                    !!to.find(
+                        (e) =>
+                            e.name ===
+                            sList[k]
+                                .replace(
+                                    /[\s.\n\r{}()=+*&^%$#@!`~:;'"\[\]\\/|?,<>]/g,
+                                    '',
+                                )
+                                .toLowerCase(),
+                    )
+                ) {
+                    this.$delete(sList, k);
+                }
+            }
+
+            this.form.powerSearch = sList.join('\n');
+            console.log(to);
+        },
         conformData(_in) {
             let tmp = [];
             for (var key in _in) {

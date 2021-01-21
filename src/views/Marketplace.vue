@@ -8,6 +8,7 @@
             <q-tab name="search" label="Search" />
             <q-tab name="watching" label="Watching" />
             <q-tab name="bid" label="Power Bid" />
+            <q-tab name="list" label="Power List" />
         </q-tabs>
 
         <q-separator />
@@ -22,6 +23,9 @@
 
             <q-tab-panel name="bid">
                 <powerBid :blockheight="height" :coinprices="coinprices" />
+            </q-tab-panel>
+
+            <q-tab-panel name="list">
             </q-tab-panel>
 
         </q-tab-panels>
