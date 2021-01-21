@@ -5,6 +5,7 @@ import router from './router';
 import store from './store';
 import './quasar';
 import moment from 'moment';
+import punycode from 'punycode';
 
 Vue.config.productionTip = false;
 
@@ -56,7 +57,8 @@ Vue.mixin({
         },
         dd2hns() {
             return (dd) => {
-                if (!dd) return undefined;
+                if (!dd) return dd;
+                //if (dd < 1000000) return dd;
                 return (dd / 1000000).toFixed(6);
             };
         },
@@ -87,6 +89,13 @@ Vue.mixin({
         },
     },
     methods: {
+        decodePuny(_in) {
+            let out = punycode.toUnicode(_in);
+            if (_in === out) {
+                return `${_in}/`;
+            }
+            return `${_in}/ (${out})`;
+        },
         isDarkRadial(input, light, dark, ratio = 125) {
             // remove the hash
             input = input.replace('#', '');

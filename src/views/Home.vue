@@ -9,66 +9,82 @@
             </template>
         </q-overlay>
         <template v-if="!reactive.loadingTable">
-            <q-markup-table dark dense>
-                <col style="width: 1px;">
-                <col style="width: auto;">
-                <col style="width: auto;">
-                <col style="width: auto;">
-                <col style="width: auto;">
-                <col style="width: 1px;">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th class="text-center">Domain</th>
-                        <th class="text-center">Views</th>
-                        <th class="text-center">Renews In</th>
-                        <th class="text-center">List Price</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr 
-                        v-for="(domain, i) in domains" :key="`domain-${i}`"
-                        :class="{ 'bg-blue-10': !!domain.amount }"
-                    >
-                        <td class="text-center"><q-icon name="mdi-playlist-check" size="1.5rem" v-if="!!domain.amount" /></td>
-                        <td class="text-center">{{ decodePuny(domain.name) }}</td>
-                        <td class="text-center">{{ domain.numberViews || 'N/A' }}</td>
-                        <td class="text-center">{{ numberWithCommas(domain.renewalBlock - blockheight) }} blocks</td>
-                        <td class="text-center">
-                            <template v-if="!!domain.amount">
-                                {{ formatdd2hns(domain.amount).slice(0, -4) + ' HNS' }} <span class="text-grey-5 q-pl-sm">{{ formatCurrency('USD', formatdd2hns(domain.amount) * coinprices.handshake) }}</span>
+            <q-table
+                dark
+                :data="conformData(domains)"
+                :columns="table.columns"
+                style="width: 100%"
+                max-height="100%"
+                class="q-table-sticky"
+            >
+
+                <template v-slot:top-right>
+                    <q-btn-group>
+                        <q-btn color="purple" @click="exportTable()">Export CSV</q-btn>
+                    </q-btn-group>
+                </template>
+
+                <template v-slot:body="props">
+                    <q-tr :props="props">
+                        <template v-for="col in props.cols">
+                            <template v-if="col.name === 'listPrice' || col.name === 'purchasePrice'">
+                                <q-td :key="col.name" :props="props">
+                                    <template v-if="col.value >= 0">
+                                        <div>
+                                            {{ numberWithCommas(Number(dd2hns(col.value))) }} HNS
+                                        </div>
+                                        <div v-if="coinprices.handshake">
+                                            {{ formatCurrency('USD', dd2hns(col.value) * coinprices.handshake) }}
+                                        </div>
+                                    </template>
+                                    <template v-else>N/A</template>
+                                </q-td>
                             </template>
-                            <template v-else>N/A</template>
-                        </td>
-                        <td>
-                            <q-btn round size="0.8rem">
-                                <q-icon name="mdi-dots-vertical" />
-                                <q-menu auto-close>
-                                    <q-item clickable>
-                                        <q-item-section>Mark For Sale</q-item-section>
-                                    </q-item>
-                                    <q-item clickable>
-                                        <q-item-section>Edit Market Info</q-item-section>
-                                    </q-item>
-                                    <q-item clickable>
-                                        <q-item-section>Edit DNS Info</q-item-section>
-                                    </q-item>
-                                    <q-item clickable class="bg-blue-10" v-if="!!domain.amount">
-                                        <q-item-section>Unlist Domain</q-item-section>
-                                    </q-item>
-                                    <q-item clickable class="bg-blue-10" v-else>
-                                        <q-item-section>List Domain</q-item-section>
-                                    </q-item>
-                                </q-menu>
-                            </q-btn>
-                        </td>
-                        <q-tooltip anchor="center left" self="center start" content-class="bg-green" v-if="!!domain.amount">
-                            Currently Listed
-                        </q-tooltip>
-                    </tr>
-                </tbody>
-            </q-markup-table>
+                            <template v-else-if="col.name === 'domain'">
+                                <q-td :key="col.name" :props="props">
+                                    {{ decodePuny(col.value) }}
+                                </q-td>
+                            </template>
+                            <template v-else-if="col.name === 'renewalBlock'">
+                                <q-td :key="col.name" :props="props">
+                                    {{ numberWithCommas(Math.abs(blockheight - col.value)) }} blocks
+                                </q-td>
+                            </template>
+                            <template v-else-if="col.name === 'options'">
+                                <q-td :key="col.name" :props="props">
+                                    <!-- options should be an object, id should be name, should be unique -->
+                                    <q-btn round size="0.8rem">
+                                        <q-icon name="mdi-dots-vertical" />
+                                        <q-menu auto-close>
+                                            <q-item clickable>
+                                                <q-item-section>Mark For Sale</q-item-section>
+                                            </q-item>
+                                            <q-item clickable>
+                                                <q-item-section>Edit Market Info</q-item-section>
+                                            </q-item>
+                                            <q-item clickable>
+                                                <q-item-section>Edit DNS Info</q-item-section>
+                                            </q-item>
+                                            <q-item clickable class="bg-blue-10">
+                                                <q-item-section>Unlist Domain</q-item-section>
+                                            </q-item>
+                                            <q-item clickable class="bg-blue-10">
+                                                <q-item-section>List Domain</q-item-section>
+                                            </q-item>
+                                        </q-menu>
+                                    </q-btn>
+                                </q-td>
+                            </template>
+                            <template v-else>
+                                <q-td :key="col.name" :props="props">
+                                    {{col.value}}
+                                </q-td>
+                            </template>
+                        </template>
+                    </q-tr>
+                </template>
+
+            </q-table>
         </template>
         <template v-else>
             <skeleton-table dark :columns="6" :rows="10" />
@@ -77,9 +93,26 @@
 </template>
 
 <script>
-import punycode from 'punycode';
 import { mapGetters } from 'vuex';
+import { exportFile } from 'quasar';
 import SkeletonTable from '../components/skeletonTable.vue';
+
+function wrapCsvValue(val, formatFn) {
+    let formatted = formatFn !== void 0 ? formatFn(val) : val;
+
+    formatted =
+        formatted === void 0 || formatted === null ? '' : String(formatted);
+
+    formatted = formatted.split('"').join('""');
+    /**
+     * Excel accepts \n and \r in strings, but some other CSV parsers do not
+     * Uncomment the next two lines to escape new lines
+     */
+    // .split('\n').join('\\n')
+    // .split('\r').join('\\r')
+
+    return `"${formatted}"`;
+}
 
 export default {
     name: 'Home',
@@ -92,6 +125,50 @@ export default {
                 loadingTable: true,
                 reloadInterval: false,
             },
+            table: {
+                columns: [
+                    {
+                        label: 'Domain',
+                        name: 'domain',
+                        field: 'domain',
+                        align: 'center',
+                        sortable: true,
+                    },
+                    {
+                        label: 'Views',
+                        name: 'views',
+                        field: 'views',
+                        align: 'center',
+                        sortable: true,
+                    },
+                    {
+                        label: 'Renews in',
+                        name: 'renewalBlock',
+                        field: 'renewalBlock',
+                        align: 'center',
+                        sortable: true,
+                    },
+                    {
+                        label: 'Purchase Price',
+                        name: 'purchasePrice',
+                        field: 'purchasePrice',
+                        align: 'center',
+                        sortable: true,
+                    },
+                    {
+                        label: 'List Price',
+                        name: 'listPrice',
+                        field: 'listPrice',
+                        align: 'center',
+                        sortable: true,
+                    },
+                    {
+                        name: 'options',
+                        field: 'options',
+                        align: 'center',
+                    },
+                ],
+            },
             waiting: false,
             fullscreen: false,
             blockheight: -1,
@@ -100,25 +177,86 @@ export default {
         };
     },
     methods: {
-        decodePuny(_in) {
-            let out = punycode.toUnicode(_in);
-            if (_in === out) {
-                return `${_in}/`;
-            }
-            return `${_in}/ (${out})`;
-        },
         organizeDomains() {
             this.domains = this.domains.sort(
                 (a, b) => a.renewalBlock - b.renewalBlock,
             );
         },
+        exportTable() {
+            // naive encoding to csv format
+            const content = [
+                this.table.columns.map((col) => wrapCsvValue(col.label)),
+            ]
+                .concat(
+                    this.conformData(this.domains).map((row) =>
+                        this.table.columns
+                            .map((col) =>
+                                wrapCsvValue(
+                                    typeof col.field === 'function'
+                                        ? col.field(row)
+                                        : row[
+                                              col.field === void 0
+                                                  ? col.name
+                                                  : col.field
+                                          ],
+                                    col.format,
+                                ),
+                            )
+                            .join(','),
+                    ),
+                )
+                .join('\r\n');
+
+            const status = exportFile(
+                `${this.table.tab}-export.csv`,
+                content,
+                'text/csv',
+            );
+
+            if (status !== true) {
+                Notify.create({
+                    message: 'Browser denied file download...',
+                    color: 'negative',
+                    icon: 'warning',
+                });
+            }
+        },
         appendDomains(_in) {
             if (!_in) return;
-            if (!this.domains.find((e) => e.name === _in.name)) {
-                for (var key in _in) {
-                    this.$set(this.domains, this.domains.length, _in[key]);
-                }
+            for (var key in _in) {
+                var index = this.domains.findIndex(
+                    (e) => e.name === _in[key].name,
+                );
+                this.$set(
+                    this.domains,
+                    index > -1 ? index : this.domains.length,
+                    _in[key],
+                );
             }
+        },
+        conformData(_in) {
+            let tmp = [];
+            for (var key in _in) {
+                var amount = -1;
+                var close = -1;
+                if (!!_in[key].amount) {
+                    amount = _in[key].amount;
+                }
+
+                if (Number.isInteger(_in[key].data.closeAmount)) {
+                    close = Number(_in[key].data.closeAmount);
+                }
+
+                tmp.push({
+                    domain: _in[key].name,
+                    views: _in[key].data.numberViews,
+                    renewalBlock: _in[key].renewalBlock,
+                    purchasePrice: close,
+                    listPrice: amount,
+                    options: _in[key],
+                });
+            }
+            return tmp;
         },
     },
     computed: {
@@ -161,8 +299,10 @@ export default {
         this.appendDomains(this.transferredDomains);
         this.organizeDomains();
         this.reactive.reloadInterval = setInterval(() => {
-            console.log('Fetching domains for updates...');
-            this.$store.dispatch('GET_DOMAINS');
+            if (!this.reactive.loadingTable) {
+                console.log('Fetching domains for updates...');
+                this.$store.dispatch('GET_DOMAINS');
+            }
         }, 15000);
     },
     beforeDestroy() {
@@ -170,3 +310,24 @@ export default {
     },
 };
 </script>
+
+<style lang="scss">
+.q-table-sticky {
+    .q-table__middle {
+        max-height: calc(100vh - 296px);
+        overflow-y: auto;
+    }
+
+    .q-table__top,
+    .q-table__bottom,
+    thead tr:first-child th {
+        z-index: 1000;
+        background-color: #1a1a1a;
+    }
+
+    thead tr:first-child th {
+        position: sticky;
+        top: 0;
+    }
+}
+</style>

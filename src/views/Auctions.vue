@@ -180,13 +180,6 @@ export default {
         };
     },
     methods: {
-        decodePuny(_in) {
-            let out = punycode.toUnicode(_in);
-            if (_in === out) {
-                return `${_in}/`;
-            }
-            return `${_in}/ (${out})`;
-        },
         conformData(_in) {
             let tmp = [];
             for (var key in _in) {

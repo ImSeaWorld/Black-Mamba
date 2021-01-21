@@ -5,7 +5,9 @@ import {
     GET_BIDS,
     GET_DOMAINS,
     UPDATE_INFO,
+    POWER_SEARCH,
     GET_DASHBOARD,
+    DOMAIN_SEARCH,
     UPDATE_BALANCE,
     FINISHED,
     SET_BIDS,
@@ -19,6 +21,7 @@ import {
     SET_LOCKEDHNS,
     SET_TABLE_STATE,
     SESSION_EXPIRED,
+    SET_SEARCH_STATE,
 } from '../actions/namebase';
 import { CONNECT } from '../actions/prices';
 
@@ -45,6 +48,16 @@ const state = {
             notlisted: [],
             transferred: [],
         },
+        search: {
+            list: '',
+            progress: 0,
+            loading: false,
+            open: [],
+            claimed: [],
+            reserved: [],
+            released: [],
+            unreleased: [],
+        },
         session: false,
         lasttimestamp: false,
     },
@@ -64,6 +77,8 @@ const getters = {
 
     usdBalance: (state) => state.namebase.balance.usd,
     hnsBalance: (state) => state.namebase.balance.hns,
+
+    namebaseSearch: (state) => state.namebase.search,
 
     allDomains: (state) => state.namebase.domains,
     domainsLength: (state) => {
@@ -188,9 +203,7 @@ const actions = {
                                             type: key,
                                             list: result.domains,
                                         });
-                                        setTimeout(() => {
-                                            _loop(i + 100, types, key);
-                                        }, 500);
+                                        _loop(i + 100, types, key);
                                     }
                                 }
 
@@ -235,9 +248,8 @@ const actions = {
                                 type: type,
                                 list: result[`${type}Bids`],
                             });
-                            setTimeout(() => {
-                                func(i + 20, type);
-                            }, 500);
+
+                            func(i + 20, type);
                         }
 
                         commit(SET_HEIGHT, result.height);
@@ -268,11 +280,88 @@ const actions = {
             }
         });
     },
+    [DOMAIN_SEARCH]: ({ commit, getters }, domain) => {
+        var instance = getters.namebase;
+        if (!instance) {
+            return commit(NOT_LOGGED_IN);
+        }
+
+        instance.domains().auction(domain, (err, status, result) => {
+            var dna = false;
+            if (err) {
+                console.error(status, err);
+            }
+
+            if (result.reserved) {
+                dna = true;
+                commit(SET_SEARCH_STATE, { reserved: result });
+            }
+
+            if (result.closeAmount) {
+                dna = true;
+                commit(SET_SEARCH_STATE, { claimed: result });
+            } else if (result.highestStakeAmount) {
+                dna = true;
+                commit(SET_SEARCH_STATE, { open: result });
+            }
+
+            if (result.height < result.releaseBlock) {
+                dna = true;
+                commit(SET_SEARCH_STATE, { unreleased: result });
+            }
+
+            if (!dna) {
+                commit(SET_SEARCH_STATE, { released: result });
+            }
+        });
+    },
+    [POWER_SEARCH]: ({ commit, dispatch }, list) => {
+        var nlist = list.replace(/^\s*$(?:\r\n?|\n)/gm, '').split('\n');
+        commit(SET_SEARCH_STATE, { list: nlist, loading: true });
+
+        for (var key in nlist) {
+            dispatch(DOMAIN_SEARCH, nlist[key]);
+        }
+
+        commit(SET_SEARCH_STATE, { loading: false });
+    },
 };
 
 const mutations = {
     [SET_TABLE_STATE]: (state, loaded) => {
         state.namebase.domains.loaded = loaded;
+    },
+    [SET_SEARCH_STATE]: (state, search) => {
+        // will update each state that exists
+        for (var k in search) {
+            if (
+                k === 'open' ||
+                k === 'claimed' ||
+                k === 'reserved' ||
+                k === 'released' ||
+                k === 'unreleased'
+            ) {
+                var index = state.namebase.search[k].findIndex(
+                    (v) => v.name === search[k].name,
+                );
+
+                console.log(search[k], index);
+
+                /*if (index == -1) {
+                    Vue.set(state.namebase.search[k],
+                        state.namebase.search[k].length,
+                        search[k]);
+                }*/
+
+                Vue.set(
+                    state.namebase.search[k],
+                    index >= 0 ? index : state.namebase.search[k].length,
+                    search[k],
+                );
+            } else {
+                state.namebase.search[k] = search[k];
+            }
+        }
     },
     [SERVER_ERROR]: (state) => {
         state.namebase.status = SERVER_ERROR;
@@ -313,18 +402,47 @@ const mutations = {
     [SET_DOMAINS]: (state, { type, list }) => {
         // types: listed, notlisted, transferred
         state.namebase.status = SET_DOMAINS;
+
+        var addData = (domain, list) => {
+            state.namebase.instance
+                .domains()
+                .auction(list[domain].name, (err, status, result) => {
+                    if (err) {
+                        console.error(err);
+                    }
+
+                    var index = state.namebase.domains[type].findIndex(
+                        (e) => e.name === list[domain].name,
+                    );
+
+                    if (result.success) {
+                        Vue.set(
+                            state.namebase.domains[type],
+                            index < 0
+                                ? state.namebase.domains[type].length
+                                : index,
+                            {
+                                ...list[domain],
+                                data: {
+                                    closeAmount: Number(result.closeAmount),
+                                    closeBlock: result.closeBlock,
+                                    highestStakeAmount:
+                                        result.highestStakeAmount,
+                                    numWatching: result.numWatching,
+                                    numberViews: result.numberViews,
+                                    openBlock: result.openBlock,
+                                    releaseBlock: result.releaseBlock,
+                                    revealBlock: result.revealBlock,
+                                    watching: result.watching,
+                                },
+                            },
+                        );
+                    }
+                });
+        };
+
         for (var domain in list) {
-            if (
-                !state.namebase.domains[type].find(
-                    (e) => e.name === list[domain].name,
-                )
-            ) {
-                Vue.set(
-                    state.namebase.domains[type],
-                    state.namebase.domains[type].length,
-                    list[domain],
-                );
-            }
+            addData(domain, list);
         }
         state.namebase.lasttimestamp = new Date().getTime();
         state.namebase.status = FINISHED;

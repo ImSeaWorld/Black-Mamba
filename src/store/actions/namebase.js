@@ -2,7 +2,9 @@ export const LOGIN = 'LOGIN';
 export const GET_BIDS = 'GET_BIDS';
 export const GET_DOMAINS = 'GET_DOMAINS';
 export const UPDATE_INFO = 'UPDATE_INFO';
+export const POWER_SEARCH = 'POWER_SEARCH';
 export const GET_DASHBOARD = 'GET_DASHBOARD';
+export const DOMAIN_SEARCH = 'DOMAIN_SEARCH';
 export const UPDATE_BALANCE = 'UPDATE_BALANCE';
 
 export const FINISHED = 'FINISHED';
@@ -17,3 +19,4 @@ export const NOT_LOGGED_IN = 'NOT_LOGGED_IN';
 export const SET_LOCKEDHNS = 'SET_LOCKEDHNS';
 export const SET_TABLE_STATE = 'SET_TABLE_STATE';
 export const SESSION_EXPIRED = 'SESSION_EXPIRED';
+export const SET_SEARCH_STATE = 'SET_SEARCH_STATE';

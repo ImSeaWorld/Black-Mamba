@@ -1,5 +1,6 @@
 'use strict';
-
+/* global __static */
+import path from 'path';
 import { app, protocol, BrowserWindow } from 'electron';
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
@@ -16,7 +17,10 @@ async function createWindow() {
         frame: false,
         width: 1600,
         height: 800,
-        icon: './src/assets/logo.ico',
+        icon:
+            process.env.NODE_ENV === 'production'
+                ? path.join(__static, 'icon.png')
+                : './src/assets/logo.ico',
         webPreferences: {
             // Use pluginOptions.nodeIntegration, leave this alone
             // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info

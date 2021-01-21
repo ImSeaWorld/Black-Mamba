@@ -247,7 +247,7 @@ export default {
                 email: '',
                 password: '',
                 _2fa: '',
-                session: false,
+                session: '',
                 tab: 'session',
             },
             app: {
@@ -309,14 +309,13 @@ export default {
             'lockedHns',
             'height',
             'session',
-            'namebaseStatus',
         ]),
         closeApplication() {
             this.app.win.destroy();
         },
     },
     computed: {
-        ...mapGetters(['namebaseBids', 'domainsLength']),
+        ...mapGetters(['namebaseBids', 'domainsLength', 'namebaseStatus']),
         activeSession() {
             return this.session();
         },
@@ -328,9 +327,6 @@ export default {
         },
         cusdBalance() {
             return this.usdBalance();
-        },
-        nbStatus() {
-            return this.namebaseStatus();
         },
     },
     watch: {
@@ -347,7 +343,8 @@ export default {
         cusdBalance(to, fro) {
             this.account.usdBalance = to;
         },
-        nbStatus(to) {
+        namebaseStatus(to) {
+            console.log(to);
             if (this.login.loading) {
                 switch (to) {
                     case 'LOGGED_IN':
@@ -359,6 +356,7 @@ export default {
             }
         },
         'login.loading'(to) {
+            console.log(to);
             if (!to && this.login.loggedin) {
                 this.app.namebaseLoop = setInterval(() => {
                     this.$store.dispatch('GET_DOMAINS');
@@ -389,6 +387,15 @@ export default {
         this.account.lockedHns = this.clockedHns;
         this.account.hnsBalance = this.chnsBalance;
         this.account.usdBalance = this.cusdBalance;
+        if (this.login.loading) {
+            switch (this.namebaseStatus) {
+                case 'LOGGED_IN':
+                case 'FAILED_LOGIN':
+                case 'NOT_LOGGED_IN': {
+                    this.login.loading = false;
+                }
+            }
+        }
     },
     beforeDestroy() {
         this.$store.dispatch('DISCONNECT');

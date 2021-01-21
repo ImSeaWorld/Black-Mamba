@@ -17,7 +17,7 @@ import {
     SET_FF_STATUS,
     SET_LASTACTION,
 } from '../actions/flatfile';
-import { LOGIN } from '../actions/namebase';
+import { LOGIN, NOT_LOGGED_IN } from '../actions/namebase';
 
 const DIRECTORY = app.getPath('userData') + '\\';
 const SAVE = DIRECTORY + 'meta.json';
@@ -65,9 +65,13 @@ const actions = {
         fs.readFile(SAVE, (err, data) => {
             if (err) throw err;
 
-            let save = JSON.parse(data);
+            try {
+                let save = JSON.parse(data);
 
-            dispatch(LOGIN, save['session']);
+                dispatch(LOGIN, save['session']);
+            } catch {
+                commit(NOT_LOGGED_IN);
+            }
         });
     },
     [REMEMBER_LOGIN]: ({ commit, dispatch }, session) => {
@@ -81,10 +85,13 @@ const actions = {
             fs.readFile(SAVE, (err, data) => {
                 if (err) throw err;
 
-                let save = JSON.parse(data);
+                let save = {};
+                try {
+                    save = JSON.parse(data);
+                } catch {}
                 save['session'] = session;
 
-                fs.writeFileSync(save);
+                fs.writeFileSync(SAVE, JSON.stringify(save));
             });
         } else {
             fs.writeFile(
@@ -121,7 +128,7 @@ const actions = {
 
             save.marked = MarkedDomains;
 
-            fs.writeFileSync(save);
+            fs.writeFileSync(SAVE, JSON.stringify(save));
         });
     },
 };
