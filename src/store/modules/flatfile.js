@@ -12,8 +12,10 @@ import {
     LOAD_SAVE,
     SAVE_LOGIN,
     MARK_DOMAIN,
+    UPDATE_SAVE,
     REMEMBER_LOGIN,
     // Mutations
+    SET_SAVE,
     SET_FF_STATUS,
     SET_LASTACTION,
 } from '../actions/flatfile';
@@ -42,13 +44,22 @@ const state = {
                 ],
             },*/
         ],
+        spa: [
+            /*{
+                name: 'Template 1',
+                categories: {},
+                domains: {},
+            }*/
+        ],
         status: NOT_LOADED,
         lastAction: false,
         coinWatch: ['eth'],
     },
 };
 
-const getters = {};
+const getters = {
+    markedDomains: (state) => state.save.marked,
+};
 
 const actions = {
     // This runs first, so check for directories here
@@ -62,13 +73,14 @@ const actions = {
             return commit(SET_FF_STATUS, NO_SAVE_FOUND);
         }
 
-        fs.readFile(SAVE, (err, data) => {
+        fs.readFile(SAVE, 'utf8', (err, data) => {
             if (err) throw err;
 
             try {
                 let save = JSON.parse(data);
 
                 dispatch(LOGIN, save['session']);
+                commit(SET_SAVE, save);
             } catch {
                 commit(NOT_LOGGED_IN);
             }
@@ -82,7 +94,7 @@ const actions = {
     [SAVE_LOGIN]: ({ commit }, session) => {
         commit(SET_LASTACTION, SAVE_LOGIN);
         if (fs.existsSync(SAVE)) {
-            fs.readFile(SAVE, (err, data) => {
+            fs.readFile(SAVE, 'utf8', (err, data) => {
                 if (err) throw err;
 
                 let save = {};
@@ -105,41 +117,64 @@ const actions = {
             );
         }
     },
-    [MARK_DOMAIN]: ({ commit }, domain, price, description) => {
+    [MARK_DOMAIN]: ({ commit }, domainObj) => {
         commit(SET_LASTACTION, MARK_DOMAIN);
         fs.readFile(SAVE, (err, data) => {
             if (err) throw err;
 
             let save = JSON.parse(data);
-            let MarkedDomains = save.marked;
 
-            if (!MarkedDomains.find((e) => e.domain === domain)) {
-                MarkedDomains.push({
-                    domain: domain,
-                    price: price,
-                    description: description,
-                });
-                commit(MARK_DOMAIN, {
-                    domain: domain,
-                    price: price,
-                    description: description,
-                });
+            if (save.marked) {
+                var fIndex = save.marked.findIndex(
+                    (e) => e.domain === domainObj.domain,
+                );
+
+                console.log(fIndex);
+                if (fIndex == -1) {
+                    save.marked.push(domainObj);
+                } else {
+                    save.marked[fIndex] = domainObj;
+                }
+            } else {
+                save.marked = [domainObj];
             }
 
-            save.marked = MarkedDomains;
+            commit(MARK_DOMAIN, domainObj);
 
-            fs.writeFileSync(SAVE, JSON.stringify(save));
+            console.log(save);
+
+            //fs.writeFileSync(SAVE, JSON.stringify(save));
+            commit(UPDATE_SAVE, save);
         });
     },
 };
 
 const mutations = {
-    [MARK_DOMAIN]: (state, { domain, price, description }) => {
-        Vue.set(state.save.marked, state.save.marked.length, {
-            domain: domain,
-            price: price,
-            description: description,
+    [MARK_DOMAIN]: (state, domainObj) => {
+        var fIndex = state.save.marked.findIndex(
+            (e) => e.domain === domainObj.domain,
+        );
+
+        Vue.set(
+            state.save.marked,
+            fIndex > -1 ? fIndex : state.save.marked.length,
+            domainObj,
+        );
+    },
+    [UPDATE_SAVE]: (state, save = null) => {
+        var _save = state.save;
+        if (save) {
+            _save = save;
+        }
+
+        fs.writeFile(SAVE, JSON.stringify(save), function(err) {
+            if (err) throw err;
+            console.log("It's saved!");
         });
+    },
+    [SET_SAVE]: (state, save) => {
+        Object.assign(state.save, save);
+        //state.save = save;
     },
     [SET_FF_STATUS]: (state, status) => {
         state.save.status = status;
