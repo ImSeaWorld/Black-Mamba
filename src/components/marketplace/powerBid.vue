@@ -173,12 +173,7 @@
                                     {{ decodePuny(col.value) }}
                                 </q-td>
                             </template>
-                            <template v-else-if="col.name === 'closingBlock'">
-                                <q-td :key="col.name" :props="props">
-                                    {{ Math.abs(col.value - blockheight) }} blocks
-                                </q-td>
-                            </template>
-                            <template v-else-if="col.name === 'revealingBlock'">
+                            <template v-else-if="col.name === 'closingBlock' && col.name === 'revealingBlock'">
                                 <q-td :key="col.name" :props="props">
                                     {{ Math.abs(col.value - blockheight) }} blocks
                                 </q-td>
@@ -234,7 +229,7 @@ function wrapCsvValue(val, formatFn) {
 
     return `"${formatted}"`;
 }
-let _cache = null;
+
 export default {
     name: 'PowerBid',
     props: {
@@ -489,7 +484,6 @@ export default {
             }
 
             this.form.powerSearch = sList.join('\n');
-            console.log(to);
         },
         conformData(_in) {
             let tmp = [];
@@ -581,63 +575,52 @@ export default {
                     )}" ${i}/${this.result.released.length}`,
                 });
                 this.namebase()
-                    .user()
-                    .bid(
+                    .Auction.Bid(
                         this.result.released[i].name,
                         Number(this.bidoverlay.bid).toFixed(6),
                         Number(this.bidoverlay.blind).toFixed(6),
-                        (err, status, result) => {
-                            if (err) {
-                                console.error(err);
-                                noti({
-                                    type: 'negative',
-                                    message: `Error bidding on domain "${this.decodePuny(
-                                        this.result.released[i].name,
-                                    )}"`,
-                                });
+                    )
+                    .then(({ data, status }) => {
+                        console.log(status, data);
+
+                        this.form.progress =
+                            (i + 1) / this.result.released.length;
+
+                        if (i == this.result.released.length - 1) {
+                            this.$delete(this.result.released, i);
+                            this.$store.dispatch('GET_BIDS');
+
+                            noti({
+                                type: 'positive',
+                                message: `Bid on ${del.length} domains of ${this.result.released.length}`,
+                                timeout: 10000,
+                            });
+
+                            for (var k in del) {
+                                this.$delete(this.result.released, del[k]);
                             }
 
-                            console.log(status, result);
+                            setTimeout(() => {
+                                this.form.progress = 0;
+                            }, 10000);
 
-                            this.form.progress =
-                                (i + 1) / this.result.released.length;
+                            Object.assign(this.$data, boData());
+                        }
 
-                            if (i == this.result.released.length - 1) {
-                                this.$delete(this.result.released, i);
-                                this.$store.dispatch('GET_BIDS');
+                        if (data.success) {
+                            del.push(i);
+                            noti({
+                                type: 'positive',
+                                message: `Placed bid on "${this.decodePuny(
+                                    this.result.released[i].name,
+                                )}"`,
+                            });
+                        }
 
-                                noti({
-                                    type: 'positive',
-                                    message: `Bid on ${del.length} domains of ${this.result.released.length}`,
-                                    timeout: 10000,
-                                });
-
-                                for (var k in del) {
-                                    this.$delete(this.result.released, del[k]);
-                                }
-
-                                setTimeout(() => {
-                                    this.form.progress = 0;
-                                }, 10000);
-
-                                Object.assign(this.$data, boData());
-                            }
-
-                            if (result.success) {
-                                del.push(i);
-                                noti({
-                                    type: 'positive',
-                                    message: `Placed bid on "${this.decodePuny(
-                                        this.result.released[i].name,
-                                    )}"`,
-                                });
-                            }
-
-                            if (i < this.result.released.length - 1) {
-                                powerBid(i + 1);
-                            }
-                        },
-                    );
+                        if (i < this.result.released.length - 1) {
+                            powerBid(i + 1);
+                        }
+                    });
             };
             powerBid(0);
             this.bidoverlay.open = false;
@@ -673,51 +656,41 @@ export default {
                     )
                 ) {
                     this.namebase()
-                        .domains()
-                        .watch(
-                            this.result[this.table.tab][i].name,
-                            (err, status, result) => {
-                                if (err) {
-                                    notification({
-                                        type: 'negative',
-                                        message: `Error trying to watch domain "${
-                                            this.result[this.table.tab][i].name
-                                        }"`,
-                                    });
-                                    console.error(status, err, result);
-                                }
+                        .WatchDomain(this.result[this.table.tab][i].name)
+                        .then(({ data, status }) => {
+                            if (data.success) {
+                                notification({
+                                    type: 'positive',
+                                    message: `Watching domain "${
+                                        this.result[this.table.tab][i].name
+                                    }"`,
+                                });
+                                del.push(i);
+                            }
 
-                                if (result.success) {
-                                    notification({
-                                        type: 'positive',
-                                        message: `Watching domain "${
-                                            this.result[this.table.tab][i].name
-                                        }"`,
-                                    });
-                                    del.push(i);
-                                }
+                            if (i == this.result[this.table.tab].length - 1) {
+                                notification({
+                                    type: 'positive',
+                                    message: `Watching ${del.length}/${
+                                        this.result[this.table.tab].length
+                                    } domains`,
+                                    timeout: 10000,
+                                });
+                            }
 
-                                if (
-                                    i ==
-                                    this.result[this.table.tab].length - 1
-                                ) {
-                                    notification({
-                                        type: 'positive',
-                                        message: `Watching ${del.length}/${
-                                            this.result[this.table.tab].length
-                                        } domains`,
-                                        timeout: 10000,
-                                    });
-                                }
-
-                                if (
-                                    i <
-                                    this.result[this.table.tab].length - 1
-                                ) {
-                                    addWatch(i + 1);
-                                }
-                            },
-                        );
+                            if (i < this.result[this.table.tab].length - 1) {
+                                addWatch(i + 1);
+                            }
+                        })
+                        .catch((e) => {
+                            notification({
+                                type: 'negative',
+                                message: `Error trying to watch domain "${
+                                    this.result[this.table.tab][i].name
+                                }"`,
+                            });
+                            console.error(e);
+                        });
                 } else {
                     notification({
                         type: 'warning',
