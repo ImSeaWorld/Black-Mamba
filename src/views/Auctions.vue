@@ -7,7 +7,7 @@
                 :data="conformData(reactive.bids[reactive.table])"
                 :columns="reactive.table !== 'revealing' ? excludeIndex(table.columns, 2) : table.columns"
                 :loading="table.loading"
-                :pagination="{ rowsPerPage: 0, sortBy: 'closingBlock' }"
+                :pagination="{ rowsPerPage: 15, sortBy: 'closingBlock' }"
                 max-height="100%"
                 class="q-table-sticky"
             >
@@ -106,7 +106,6 @@
 </template>
 
 <script>
-import punycode from 'punycode';
 import { mapGetters } from 'vuex';
 import SkeletonTable from '../components/skeletonTable.vue';
 
@@ -254,6 +253,8 @@ export default {
                 this.reactive.table = 'revealing';
             }
         }
+
+        this.$store.dispatch('GET_BIDS', true);
         this.reactive.reloadInterval = setInterval(() => {
             this.$store.dispatch('GET_BIDS');
         }, 15000);
