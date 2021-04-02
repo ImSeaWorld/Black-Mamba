@@ -1,5 +1,8 @@
 export const LOGIN = 'LOGIN';
 export const GET_BIDS = 'GET_BIDS';
+export const POWER_LIST = 'POWER_LIST';
+export const LIST_DOMAIN = 'LIST_DOMAIN';
+export const LOCAL_LOGIN = 'LOCAL_LOGIN';
 export const GET_DOMAINS = 'GET_DOMAINS';
 export const UPDATE_INFO = 'UPDATE_INFO';
 export const POWER_SEARCH = 'POWER_SEARCH';

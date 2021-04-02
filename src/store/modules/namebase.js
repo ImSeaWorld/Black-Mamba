@@ -3,8 +3,11 @@ import NameBase from 'namebasejs';
 import {
     LOGIN,
     GET_BIDS,
+    POWER_LIST,
     GET_DOMAINS,
     UPDATE_INFO,
+    LIST_DOMAIN,
+    LOCAL_LOGIN,
     POWER_SEARCH,
     GET_DASHBOARD,
     DOMAIN_SEARCH,
@@ -24,7 +27,6 @@ import {
     SET_SEARCH_STATE,
 } from '../actions/namebase';
 import { CONNECT } from '../actions/prices';
-import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 
 const state = {
     namebase: {
@@ -48,6 +50,13 @@ const state = {
             listed: [],
             notlisted: [],
             transferred: [],
+            totalDomains: 0,
+        },
+        lister: {
+            loop: null,
+            current: '',
+            index: 0,
+            errors: [],
         },
         search: {
             list: '',
@@ -81,13 +90,21 @@ const getters = {
 
     namebaseSearch: (state) => state.namebase.search,
 
+    powerListerInstance: (state) => state.namebase.lister,
+
+    spreadDomains: (state) => [
+        ...state.namebase.domains.listed,
+        ...state.namebase.domains.notlisted,
+        // We're not going to include transferred
+    ],
     allDomains: (state) => state.namebase.domains,
     domainsLength: (state) => {
-        return (
+        return state.namebase.domains.totalDomains;
+        /*return (
             state.namebase.domains.listed.length +
             state.namebase.domains.notlisted.length +
             state.namebase.domains.transferred.length
-        );
+        );*/
     },
     domainsLoaded: (state) => state.namebase.domains.loaded,
     listedDomains: (state) => state.namebase.domains.listed,
@@ -96,38 +113,120 @@ const getters = {
 };
 
 const actions = {
+    [LOCAL_LOGIN]: ({ dispatch, getters }, { Email, Password, Token }) => {
+        return new Promise((resolve, reject) => {
+            if (Email == '' && Password == '')
+                reject('Empty fields email and password. Come on guy...');
+
+            var instance = getters.namebase;
+            if (!instance) {
+                instance = new NameBase();
+            }
+
+            instance.Auth.Login({ Email, Password, Token })
+                .then(({ data, status, session }) => {
+                    console.log(data, session);
+
+                    if (status != 200)
+                        reject(
+                            `Sever replied with ${status} which is unexpected`,
+                        );
+
+                    if (data.success) {
+                        dispatch(LOGIN, session.split('=')[1]).then(resolve);
+                    } else reject(data);
+                })
+                .catch(reject);
+        });
+    },
     [LOGIN]: ({ commit, dispatch, getters }, session) => {
-        if (!session) {
-            return commit(FAILED_LOGIN);
-        }
+        return new Promise((resolve, reject) => {
+            if (!session) reject('Session not set!');
 
-        var instance = getters.namebase;
-        if (!instance) {
-            instance = new NameBase({ Session: session });
-        }
-
-        instance.user((error, status, result) => {
-            if (status !== 200 || error) {
-                return commit(SERVER_ERROR);
+            var instance = getters.namebase;
+            if (!instance) {
+                instance = new NameBase({ Session: session });
             }
 
-            if (status === 200 && result.hns_balance !== undefined) {
-                commit(SET_BALANCE, {
-                    type: 'hns',
-                    balance: result.hns_balance,
-                });
-                commit(SET_BALANCE, {
-                    type: 'usd',
-                    balance: result.usd_balance,
-                });
+            instance.User.Self().then(({ data, status }) => {
+                if (status != 200)
+                    reject(`Sever replied with ${status} which is unexpected`);
 
-                commit(LOGGED_IN, { namebase: instance, session: session });
+                if (data.hns_balance !== undefined) {
+                    commit(SET_BALANCE, {
+                        type: 'hns',
+                        balance: data.hns_balance,
+                    });
 
-                dispatch(GET_BIDS);
-                dispatch(GET_DOMAINS);
-                dispatch(GET_DASHBOARD);
-                dispatch(CONNECT);
+                    commit(SET_BALANCE, {
+                        type: 'usd',
+                        balance: data.usd_balance,
+                    });
+
+                    commit(LOGGED_IN, { namebase: instance, session: session });
+
+                    dispatch(GET_BIDS);
+                    dispatch(GET_DOMAINS);
+                    dispatch(GET_DASHBOARD);
+                    dispatch(CONNECT);
+                    resolve();
+                }
+            });
+        });
+    },
+    [POWER_LIST]: ({ commit, dispatch, getters }, cancel = false) => {
+        var marked = getters.markedDomains;
+        var lister = getters.powerListerInstance;
+
+        var cw = (numDomains, totalLength) => {
+            return 1 / (numDomains / totalLength);
+        };
+
+        var loop = (getters) => {
+            // Get new instance every loop
+            var _nList = getters.powerListerInstance;
+            var _nMarked = getters.markedDomains;
+            console.log(`New Loop:`, _nList, _nMarked);
+            dispatch(LIST_DOMAIN, _nMarked[_nList.index]).then(() => {
+                commit(POWER_LIST, {
+                    loop: _loop,
+                    index: _nList.index++,
+                    domain: _nMarked[_nList.index].domain,
+                });
+            });
+        };
+
+        if (!lister.loop) {
+            var _loop = setInterval(
+                () => loop(getters),
+                cw(Object.keys(marked).length, 2.16e7 * 4),
+            );
+        } else {
+            if (cancel) {
+                clearInterval(lister.loop);
             }
+        }
+    },
+    [LIST_DOMAIN]: ({ commit, getters }, { domain, price, description }) => {
+        /* prettier-ignore */
+        return new Promise((resolve, reject) => {
+            var instance = getters.namebase;
+
+            if (!instance) reject('Must be logged in');
+
+            instance.Marketplace.Domain(marked.domain).then(({data, status}) => {
+                if (status != 200) reject(`Sever replied with ${status} which is unexpected`);
+
+                if (data.success && data.isOwner) {
+                    instance.Marketplace.List(domain, price, description).then(({data, status}) => {
+                        if (data.success) {
+                            resolve();
+                        }
+
+                        reject(`Failed to list domain ${domain} :: status ${status} :: ${JSON.stringify(data)}`);
+                    }).catch(reject);
+                }
+            }).catch(reject);
         });
     },
     [UPDATE_INFO]: ({ commit, dispatch, getters }) => {
@@ -141,7 +240,24 @@ const actions = {
         dispatch(UPDATE_BALANCE);
     },
     [GET_DASHBOARD]: ({ commit, getters }) => {
-        var instance = getters.namebase;
+        return new Promise((resolve, reject) => {
+            var instance = getters.namebase;
+
+            if (!instance) reject('Not logged in!');
+
+            instance.User.Dashboard()
+                .then(({ data, status }) => {
+                    if (status >= 500) reject('Server returned an error!');
+
+                    if (data.success) {
+                        commit(SET_HEIGHT, data.height);
+                        commit(SET_LOCKEDHNS, data.lockedHns);
+                        resolve();
+                    }
+                })
+                .catch(reject);
+        });
+        /*var instance = getters.namebase;
 
         if (!instance) {
             return commit(NOT_LOGGED_IN);
@@ -156,206 +272,239 @@ const actions = {
                 commit(SET_HEIGHT, result.height);
                 commit(SET_LOCKEDHNS, result.lockedHns);
             }
-        });
+        });*/
     },
     [GET_DOMAINS]: ({ commit, getters }) => {
-        var instance = getters.namebase;
-        if (!instance) {
-            return commit(NOT_LOGGED_IN);
-        }
+        return new Promise((resolve, reject) => {
+            var instance = getters.namebase;
 
-        commit(SET_TABLE_STATE, false);
+            if (!instance) reject('Not logged in!');
 
-        var types = {
-            listed: 'listedDomains',
-            notlisted: 'domains',
-            transferred: 'transferredDomains',
-        };
+            commit(SET_TABLE_STATE, false);
 
-        for (var key in types) {
-            var handle = (key) => (error, status, result) => {
-                if (error || status !== 200) {
-                    return commit(SERVER_ERROR);
-                }
-
-                commit(SET_HEIGHT, result.currentHeight);
-                commit(SET_DOMAINS, { type: key, list: result.domains });
+            var types = {
+                listed: 'ListedDomains',
+                notlisted: 'Domains',
+                transferred: 'TransferredDomains',
             };
 
-            if (key === 'listed') {
-                instance.user()[types[key]](handle(key));
-            } else {
-                var _loop = (i, types, key) => {
-                    instance
-                        .user()
-                        [types[key]](
-                            i,
-                            'acquiredAt',
-                            'asc',
-                            100,
-                            (error, status, result) => {
-                                if (error || status !== 200) {
-                                    return commit(SERVER_ERROR);
-                                }
+            for (var key in types) {
+                console.log(`[${key}] = ${types[key]}`);
+                if (key === 'listed') {
+                    instance.User[types[key]]().then(({ data, status }) => {
+                        if (status != 200)
+                            reject(
+                                `Server sent an unexpected response: ${status}`,
+                            );
 
-                                if (result.domains) {
-                                    if (result.domains.length > 0) {
-                                        commit(SET_DOMAINS, {
-                                            type: key,
-                                            list: result.domains,
-                                        });
+                        commit(SET_HEIGHT, data.currentHeight);
+                        commit(SET_DOMAINS, {
+                            type: key,
+                            list: data.domains,
+                        });
+                    });
+                } else {
+                    var _loop = (i, types, key) => {
+                        instance.User[types[key]]({
+                            offset: i,
+                            sortKey: 'acquiredAt',
+                            sortDirection: 'desc',
+                            limit: 100,
+                        }).then(({ data }) => {
+                            if (data.domains) {
+                                if (data.domains.length > 0) {
+                                    commit(SET_DOMAINS, {
+                                        type: key,
+                                        list: data.domains,
+                                        count: data.totalCount,
+                                    });
+
+                                    if (data.domains.length == 100)
                                         _loop(i + 100, types, key);
-                                    }
                                 }
+                            }
 
-                                commit(SET_HEIGHT, result.currentHeight);
-                            },
-                        );
-                };
-                _loop(0, types, key);
+                            commit(SET_HEIGHT, data.currentHeight);
+                        });
+                    };
+                    _loop(0, types, key);
+                }
             }
-        }
-
-        commit(SET_TABLE_STATE, true);
+            commit(SET_TABLE_STATE, true);
+            resolve();
+        });
     },
-    [GET_BIDS]: ({ commit, getters }) => {
+    [GET_BIDS]: ({ commit, getters }, clear = false) => {
         var instance = getters.namebase;
         if (!instance) {
             return commit(NOT_LOGGED_IN);
         }
 
-        var types = ['open', 'lost', 'revealing'];
+        commit(SET_BIDS, { clear: clear });
+
+        var types = ['Open', 'Lost', 'Revealing'];
 
         for (var ti in types) {
             var func = (i, type) =>
-                instance
-                    .user()
-                    .bids()
-                    [type](i, (error, status, result) => {
-                        if (error || status !== 200) {
-                            console.error(error, status);
-                            return commit(SERVER_ERROR);
-                        }
+                instance.User.Bids[type](i).then(({ data, status }) => {
+                    if (status != 200) commit(SERVER_ERROR);
 
-                        if (!!result.errorCode) {
-                            if (result.errorCode === 'mustBeLoggedIn') {
-                                console.error(result, status);
-                                return commit(SESSION_EXPIRED);
-                            }
-                        }
+                    if (
+                        !!data.errorCode &&
+                        data.errorCode === 'mustBeLoggedIn'
+                    ) {
+                        console.error(data, status);
+                        commit(SESSION_EXPIRED);
+                        return;
+                    }
 
-                        if (result[`${type}Bids`].length > 0) {
-                            commit(SET_BIDS, {
-                                type: type,
-                                list: result[`${type}Bids`],
-                            });
+                    if (data[`${type.toLowerCase()}Bids`].length > 0) {
+                        commit(SET_BIDS, {
+                            type: type.toLowerCase(),
+                            list: data[`${type.toLowerCase()}Bids`],
+                        });
 
-                            func(i + 20, type);
-                        }
+                        func(i + 20, type);
+                    }
 
-                        commit(SET_HEIGHT, result.height);
-                    });
+                    commit(SET_HEIGHT, data.height);
+                });
             func(0, types[ti]);
         }
     },
     [UPDATE_BALANCE]: ({ commit, getters }) => {
-        var instance = getters.namebase;
-        if (!instance) {
-            return commit(NOT_LOGGED_IN);
-        }
+        return new Promise((resolve, reject) => {
+            var instance = getters.namebase;
 
-        instance.user((error, status, result) => {
-            if (status === 500 || error) {
-                return commit(SERVER_ERROR);
-            }
+            if (!instance) reject('Not logged in!');
 
-            if (status === 200 && result.hns_balance !== undefined) {
-                commit(SET_BALANCE, {
-                    type: 'hns',
-                    balance: result.hns_balance,
-                });
-                commit(SET_BALANCE, {
-                    type: 'usd',
-                    balance: result.usd_balance,
-                });
-            }
+            instance.User.Self().then(({ data, status }) => {
+                if (status >= 500) reject('Unexpected error');
+
+                if (data.hns_balance !== undefined) {
+                    commit(SET_BALANCE, {
+                        type: 'hns',
+                        balance: data.hns_balance,
+                    });
+                    commit(SET_BALANCE, {
+                        type: 'usd',
+                        balance: data.usd_balance,
+                    });
+                }
+            });
         });
     },
     [DOMAIN_SEARCH]: ({ commit, getters }, { domain, progress }) => {
-        var instance = getters.namebase;
-        if (!instance) {
-            return commit(NOT_LOGGED_IN);
-        }
-
-        // sanitize domain further
-        // Removes the following: !@#$%^&*()+`~:;'"[]}{\/|?,<>
-        // Cannot lead with underscore, but underscores are legal
-        // Cannot be 2 numbers, but multiple numbers is legal
-        domain = domain
-            .replace(/[\s.\n\r{}()=+*&^%$#@!`~:;'"\[\]\\/|?,<>]/g, '')
-            .toLowerCase();
-
-        instance.domains().auction(domain, (err, status, result) => {
-            var dna = false;
-            if (err) {
-                console.error(status, err);
+        return new Promise((resolve, reject) => {
+            var instance = getters.namebase;
+            if (!instance) {
+                return commit(NOT_LOGGED_IN);
             }
 
-            if (result.invalidName) {
-                dna = true;
-                console.error('Invalid Name: ', domain);
-            }
+            // sanitize domain further
+            // Removes the following: !@#$%^&*()+`~:;'"[]}{\/|?,<>
+            // Cannot lead with underscore, but underscores are legal
+            // Cannot be 2 numbers, but multiple numbers is legal
+            domain = domain
+                .replace(/[\s.\n\r{}()=+*&^%$#@!`~:;'"\[\]\\/|?,<>]/g, '')
+                .toLowerCase();
 
-            if (result.reserved) {
-                dna = true;
-                commit(SET_SEARCH_STATE, { reserved: result });
-            }
+            instance
+                .Domain(domain)
+                .then(({ data, status }) => {
+                    var dna = false;
+                    if (data.invalidName) {
+                        dna = true;
+                        reject(`Invalid name: ${domain}`);
+                    }
 
-            if (result.closeAmount) {
-                dna = true;
-                commit(SET_SEARCH_STATE, { claimed: result });
-            } else if (result.highestStakeAmount) {
-                dna = true;
-                commit(SET_SEARCH_STATE, { open: result });
-            }
+                    if (data.reserved) {
+                        dna = true;
+                        commit(SET_SEARCH_STATE, { reserved: data });
+                    }
 
-            if (result.height < result.releaseBlock) {
-                dna = true;
-                commit(SET_SEARCH_STATE, { unreleased: result });
-            }
+                    if (data.closeAmount) {
+                        dna = true;
+                        commit(SET_SEARCH_STATE, { claimed: data });
+                    } else if (data.highestStakeAmount) {
+                        dna = true;
+                        commit(SET_SEARCH_STATE, { open: data });
+                    }
 
-            if (!dna) {
-                commit(SET_SEARCH_STATE, { released: result });
-            }
+                    if (data.height < data.releaseBlock) {
+                        dna = true;
+                        commit(SET_SEARCH_STATE, { unreleased: data });
+                    }
 
-            if (progress > getters.namebaseSearch.progress) {
-                commit(SET_SEARCH_STATE, { progress: progress });
-                if (progress >= 1) {
-                    setTimeout(() => {
-                        commit(SET_SEARCH_STATE, { progress: 0 });
-                    }, 6500);
-                }
-            }
+                    if (!dna) {
+                        commit(SET_SEARCH_STATE, { released: data });
+                    }
+
+                    if (progress > getters.namebaseSearch.progress) {
+                        commit(SET_SEARCH_STATE, { progress: progress });
+                        if (progress >= 1) {
+                            setTimeout(() => {
+                                commit(SET_SEARCH_STATE, { progress: 0 });
+                            }, 6500);
+                        }
+                    }
+
+                    resolve();
+                })
+                .catch(reject);
         });
     },
-    [POWER_SEARCH]: ({ commit, dispatch }, list) => {
+    [POWER_SEARCH]: ({ commit, dispatch, getters }, list) => {
         var nlist = list.replace(/^\s*$(?:\r\n?|\n)/gm, '').split('\n');
         commit(SET_SEARCH_STATE, { list: nlist, loading: true });
 
-        let i = 0;
-        for (var key in nlist) {
+        let i = 0,
+            x = 0;
+        var _loop = () => {
             dispatch(DOMAIN_SEARCH, {
-                domain: nlist[key],
+                domain: nlist[x++],
                 progress: ++i / nlist.length,
-            });
-            console.log(i);
-        }
+            })
+                .then(() => {
+                    if (x <= nlist.length - 1) _loop();
+                    else commit(SET_SEARCH_STATE, { loading: false });
 
-        commit(SET_SEARCH_STATE, { loading: false });
+                    console.log(
+                        x <= nlist.length - 1
+                            ? `Loop ${x}/${nlist.length - 1} - ${i}`
+                            : `Loading ${getters.namebaseSearch.loading}`,
+                    );
+                })
+                .catch((e) => {
+                    if (x <= nlist.length - 1) _loop();
+                    else commit(SET_SEARCH_STATE, { loading: false });
+                });
+        };
+        _loop();
     },
 };
 
 const mutations = {
+    [POWER_LIST]: (state, { loop, domain, index, error }) => {
+        if (error) {
+            state.lister.errors.push(error);
+            return;
+        }
+
+        if (loop) {
+            state.lister.loop = loop;
+        } else if (loop === null) {
+            clearInterval(state.lister.loop);
+        }
+
+        if (domain) {
+            state.lister.current = domain;
+        }
+
+        if (index) {
+            state.lister.index = index;
+        }
+    },
     [SET_TABLE_STATE]: (state, loaded) => {
         state.namebase.domains.loaded = loaded;
     },
@@ -421,23 +570,30 @@ const mutations = {
         state.namebase.balance[type] = balance;
         state.namebase.lasttimestamp = new Date().getTime();
     },
-    [SET_DOMAINS]: (state, { type, list }) => {
+    [SET_DOMAINS]: (state, { type, list, count }) => {
         // types: listed, notlisted, transferred
         state.namebase.status = SET_DOMAINS;
+        state.namebase.domains.totalDomains = count || 0;
 
         var addData = (domain, list) => {
             state.namebase.instance
-                .domains()
-                .auction(list[domain].name, (err, status, result) => {
-                    if (err) {
-                        console.error(err);
+                .Domain(list[domain].name)
+                .then(({ data }) => {
+                    if (
+                        data ==
+                        'Too many requests sent from this IP, please try again shortly.'
+                    ) {
+                        setTimeout(() => {
+                            addData(domain, list);
+                        }, 500);
+                        return;
                     }
 
                     var index = state.namebase.domains[type].findIndex(
                         (e) => e.name === list[domain].name,
                     );
 
-                    if (result.success) {
+                    if (data.success) {
                         Vue.set(
                             state.namebase.domains[type],
                             index < 0
@@ -446,16 +602,15 @@ const mutations = {
                             {
                                 ...list[domain],
                                 data: {
-                                    closeAmount: Number(result.closeAmount),
-                                    closeBlock: result.closeBlock,
-                                    highestStakeAmount:
-                                        result.highestStakeAmount,
-                                    numWatching: result.numWatching,
-                                    numberViews: result.numberViews,
-                                    openBlock: result.openBlock,
-                                    releaseBlock: result.releaseBlock,
-                                    revealBlock: result.revealBlock,
-                                    watching: result.watching,
+                                    closeAmount: Number(data.closeAmount),
+                                    closeBlock: data.closeBlock,
+                                    highestStakeAmount: data.highestStakeAmount,
+                                    numWatching: data.numWatching,
+                                    numberViews: data.numberViews,
+                                    openBlock: data.openBlock,
+                                    releaseBlock: data.releaseBlock,
+                                    revealBlock: data.revealBlock,
+                                    watching: data.watching,
                                 },
                             },
                         );
@@ -469,12 +624,26 @@ const mutations = {
         state.namebase.lasttimestamp = new Date().getTime();
         state.namebase.status = FINISHED;
     },
-    [SET_BIDS]: (state, { type, list }) => {
+    [SET_BIDS]: (state, { type, list, clear }) => {
         state.namebase.status = SET_BIDS;
+
+        if (clear) {
+            for (var type in state.namebase.bids) {
+                state.namebase.bids[type] = [];
+            }
+            return;
+        }
+
+        //console.log(type, list, clear);
+
         for (var domain in list) {
-            var index = state.namebase.bids[type].findIndex(
-                (e) => e.domain === list[domain].domain,
-            );
+            try {
+                var index = state.namebase.bids[type].findIndex(
+                    (e) => e.domain === list[domain].domain,
+                );
+            } catch (e) {
+                console.error(`${type} - ${e}`);
+            }
 
             Vue.set(
                 state.namebase.bids[type],
