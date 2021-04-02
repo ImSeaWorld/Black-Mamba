@@ -1,13 +1,14 @@
 <template>
     <div class="q-pa-md" ref="tvContainer">
-        <trading-vue 
+        <!--trading-vue 
             :data="chart"
             :width="chart.width"
             colorBack="#121212"
             colorCandleUp="green"
             colorCandleDown="red"
             :charConfig="chart.config"
-        />
+        /-->
+        <!-- Calculators and shit because why not -->
     </div>
 </template>
 
@@ -31,14 +32,14 @@ export default {
         };
     },
     created() {
-        window.addEventListener('resize', this.setWidth);
+        //window.addEventListener('resize', this.setWidth);
     },
     mounted() {
-        this.loadCandles();
-        this.chart.width = this.$refs.tvContainer.clientWidth - 35;
+        //this.loadCandles();
+        //this.chart.width = this.$refs.tvContainer.clientWidth - 35;
     },
     destroyed() {
-        window.removeEventListener('resize', this.setWidth);
+        //window.removeEventListener('resize', this.setWidth);
     },
     methods: {
         setWidth() {
