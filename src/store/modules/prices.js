@@ -35,17 +35,13 @@ const actions = {
 
         var coins = getters.getCoins;
         var connection = new WebSocket(
-            'wss://ws.coincap.io/prices?assets=bitcoin,handshake' +
+            'wss://ws.coincap.io/prices?assets=bitcoin,handshake,dogecoin,stellar,ethereum' +
                 (coins.length > 0 ? ',' : '') +
                 [...coins].join(','),
         );
 
         connection.onopen = () => {
             commit(CONNECTED, connection);
-        };
-
-        connection.onclose = (event) => {
-            commit(CLOSED);
         };
 
         connection.onmessage = (event) => {
@@ -57,6 +53,27 @@ const actions = {
                     price: data[coin],
                 });
             }
+        };
+
+        var onCloseError = (event) => {
+            console.error(event);
+            if (!event.wasClean) {
+                console.warn(`Disconnected, wasn't clean so we'll try again.`);
+            } else {
+                console.warn(
+                    `Disconnected cleanly. How neat! We'll reconnect again.`,
+                );
+            }
+
+            setTimeout(() => {
+                dispatch(CONNECT);
+            }, 15000);
+        };
+
+        connection.onclose = onCloseError;
+        connection.onerror = (e) => {
+            console.warn(`Connection to coincap couldn't be established.`);
+            commit(CLOSED);
         };
     },
     [DISCONNECT]: ({ commit }) => {
