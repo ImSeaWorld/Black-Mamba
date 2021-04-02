@@ -18,7 +18,7 @@
                         indicator-color="primary"
                     >
                         <q-tab name="session" label="Session" />
-                        <q-tab name="local" label="Email/Pass" disable />
+                        <q-tab name="local" label="Email/Pass"  />
                     </q-tabs>
                     <q-separator />
                     <q-tab-panels animated v-model="login.tab" :dark="false">
@@ -35,7 +35,7 @@
                                     :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
                                 />
                                     <q-checkbox :dark="false" class="text-grey-7" style="font-size: 1.2rem;user-select: none;" v-model="login.remember" label="Memba Me" />
-                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="$store.dispatch(login.remember ? 'REMEMBER_LOGIN' : 'LOGIN', login.session)"></q-btn>
+                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="nbLogin()"></q-btn>
                             </q-form>
                         </q-tab-panel>
                         <q-tab-panel name="local">
@@ -46,6 +46,7 @@
                                     label="Email" 
                                     hint="Your email stupid..." 
                                     :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                    v-model="login.email"
                                 />
 
                                 <q-input 
@@ -56,6 +57,7 @@
                                     hint="Your password stoopid..."
                                     type="password"
                                     :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                    v-model="login.password"
                                 />
 
                                 <q-input 
@@ -64,10 +66,10 @@
                                     class="q-my-sm"
                                     label="2FA" 
                                     hint="Your 2fa stewpid..."
-                                    :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
+                                    v-model="login._2fa"
                                 />
                                 
-                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="login.loggedin = !login.loggedin"></q-btn>
+                                <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="nbLogin()"></q-btn>
 
                             </q-form>
                         </q-tab-panel>
@@ -86,6 +88,7 @@
 
             <q-toolbar-title>Black Mamba</q-toolbar-title>
 
+            <!-- Windows Buttons -->
             <q-btn dense flat round icon="mdi-bell" size="md" @click="right = !right" style="-webkit-app-region: no-drag;" :style="!login.loggedin ? 'display: none;' : ''" disable>
                 <!--q-badge floating transparent color="negative" style="font-size: 0.7rem;">12</q-badge-->
             </q-btn>
@@ -93,6 +96,7 @@
             <q-btn flat dense icon="mdi-window-minimize" @click="app.win.minimize()" style="-webkit-app-region: no-drag" />
             <q-btn flat dense :icon="`mdi-window-${app.maximized ? 'restore' : 'maximize'}`" @click="() => {if(app.maximized) app.win.unmaximize(); else app.win.maximize();}" style="-webkit-app-region: no-drag" />
             <q-btn flat dense icon="mdi-close" @click="app.win.destroy()" style="-webkit-app-region: no-drag" />
+            <!-- END Windows Buttons -->
         </q-toolbar>
 
         <q-tabs align="left">
@@ -107,8 +111,9 @@
                     <span class="text-red" style="padding-left: 3px;font-weight: bold;">{{namebaseBids.lost.length}}</span>
                 </q-badge>
             </q-route-tab>
-            <q-route-tab to="/boyses" label="The Boyses" :disable="!login.loggedin" />
+            <!--q-route-tab to="/boyses" label="The Boyses" :disable="!login.loggedin" /-->
             <q-route-tab to="/coin" label="The Coin Aye" :disable="!login.loggedin" />
+            <q-route-tab to="/spa" label="SPA Builder" :disable="!login.loggedin" />
             <q-route-tab to="/log" label="Log" :disable="!login.loggedin" />
         </q-tabs>
     </q-header>
@@ -233,9 +238,8 @@
 
 <script>
 import moment from 'moment';
-import punycode from 'punycode';
 import { remote } from 'electron';
-import { mapMutations, mapGetters, mapState } from 'vuex';
+import { mapGetters } from 'vuex';
 
 export default {
     data() {
@@ -310,8 +314,36 @@ export default {
             'height',
             'session',
         ]),
+        nbLogin() {
+            if (this.login.tab === 'local') {
+                this.$store.dispatch('LOCAL_LOGIN', {
+                    Email: this.login.email,
+                    Password: this.login.password,
+                    Token: this.login._2fa,
+                });
+            } else {
+                this.$store.dispatch('LOGIN', this.login.session);
+            }
+        },
         closeApplication() {
             this.app.win.destroy();
+        },
+        updateMetadata() {
+            if (this.login.loggedin) {
+                if (remote.BrowserWindow.getAllWindows()[0].isFocused()) {
+                    if (this.$route.name != 'Auctions') {
+                        this.$store.dispatch('GET_BIDS');
+                        //console.warn('GET_BIDS');
+                    }
+
+                    if (this.$route.name != 'Home') {
+                        this.$store.dispatch('GET_DOMAINS');
+                        //console.warn('GET_DOMAINS');
+                    }
+                }
+
+                this.$store.dispatch('UPDATE_INFO');
+            }
         },
     },
     computed: {
@@ -330,6 +362,9 @@ export default {
         },
     },
     watch: {
+        domainsLength(to) {
+            //console.log(to);
+        },
         activeSession(to) {
             this.login.session = to;
             this.login.loggedin = !!to;
@@ -344,7 +379,7 @@ export default {
             this.account.usdBalance = to;
         },
         namebaseStatus(to) {
-            console.log(to);
+            //console.log('namebaseStatus:', to);
             if (this.login.loading) {
                 switch (to) {
                     case 'LOGGED_IN':
@@ -353,25 +388,6 @@ export default {
                         this.login.loading = false;
                     }
                 }
-            }
-        },
-        'login.loading'(to) {
-            console.log(to, this.login.loggedin);
-            if (!to && this.login.loggedin) {
-                this.app.namebaseLoop = setInterval(() => {
-                    console.log(this.$route.name);
-
-                    if (this.$route.name != 'Auctions') {
-                        this.$store.dispatch('GET_BIDS');
-                    }
-
-                    if (this.$route.name != 'Home') {
-                        this.$store.dispatch('GET_DOMAINS');
-                    }
-
-                    this.$store.dispatch('UPDATE_INFO');
-                }, 30000);
-                console.log(this.app.namebaseLoop);
             }
         },
     },
@@ -384,6 +400,7 @@ export default {
     beforeMount() {
         this.login.loggedin = !!this.session();
         this.prices = this.getCoinPrices();
+        this.app.namebaseLoop = setInterval(this.updateMetadata, 30000);
 
         this.app.win.on('maximize', () => {
             this.app.maximized = true;
