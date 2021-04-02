@@ -26,6 +26,11 @@ const routes = [
         component: () => import('../views/boyses.vue'),
     },*/
     {
+        path: '/spa',
+        name: 'SPABuilder',
+        component: () => import('../views/SPABuilder.vue'),
+    },
+    {
         path: '/auctions',
         name: 'Auctions',
         component: () => import('../views/Auctions.vue'),
