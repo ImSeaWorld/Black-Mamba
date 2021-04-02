@@ -5,18 +5,14 @@
             v-model="tab"
             class="text-grey-5"
         >
-            <q-tab name="search" label="Search" />
             <q-tab name="watching" label="Watching" />
-            <q-tab name="bid" label="Power Bid" />
+            <q-tab name="bid" label="Power Search/Bid" />
             <q-tab name="list" label="Power List" />
         </q-tabs>
 
         <q-separator />
 
         <q-tab-panels v-model="tab" animated>
-
-            <q-tab-panel name="search">
-            </q-tab-panel>
 
             <q-tab-panel name="watching">
             </q-tab-panel>
@@ -26,6 +22,7 @@
             </q-tab-panel>
 
             <q-tab-panel name="list">
+                <powerList :coinprices="coinprices" />
             </q-tab-panel>
 
         </q-tab-panels>
@@ -34,10 +31,9 @@
 </template>
 
 <script>
-import punycode from 'punycode';
 import { mapGetters } from 'vuex';
-import { exportFile, Notify } from 'quasar';
 import powerBid from '@/components/marketplace/powerBid.vue';
+import powerList from '@/components/marketplace/powerList.vue';
 
 export default {
     name: 'Marketplace',
@@ -50,6 +46,7 @@ export default {
     },
     components: {
         powerBid,
+        powerList,
     },
     computed: {
         ...mapGetters(['getCoinPrices', 'height']),
