@@ -6,6 +6,36 @@ import store from './store';
 import './quasar';
 import moment from 'moment';
 import punycode from 'punycode';
+/*import { app, dialog, autoUpdater } from 'electron';
+
+const server = 'https://your-deployment-url.com';
+const url = `${server}/update/${process.platform}/${app.getVersion()}`;
+autoUpdater.setFeedURL({ url });
+autoUpdater.checkForUpdates();
+
+setInterval(() => {
+    autoUpdater.checkForUpdates();
+}, 60000);
+
+autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+    const dialogOpts = {
+        type: 'info',
+        buttons: ['Restart', 'Later'],
+        title: 'Application Update',
+        message: process.platform === 'win32' ? releaseNotes : releaseName,
+        detail:
+            'A new version has been downloaded. Restart the application to apply the updates.',
+    };
+
+    dialog.showMessageBox(dialogOpts).then((returnValue) => {
+        if (returnValue.response === 0) autoUpdater.quitAndInstall();
+    });
+});
+
+autoUpdater.on('error', (message) => {
+    console.error('There was a problem updating the application');
+    console.error(message);
+});*/
 
 Vue.config.productionTip = false;
 
@@ -29,7 +59,72 @@ moment.updateLocale('en', {
         yy: '%d years',
     },
 });
+
 Vue.use(require('vue-moment'), { moment });
+
+// https://forum.vuejs.org/t/render-inside-iframe/6419/2
+Vue.component('i-frame', {
+    render(h) {
+        return h('iframe', {
+            on: { load: this.renderChildren },
+        });
+    },
+    beforeUpdate() {
+        //freezing to prevent unnessessary Reactifiation of vNodes
+        this.iApp.children = Object.freeze(this.$slots.default);
+    },
+    props: {
+        css: String,
+        headers: Array,
+        bodyClasses: Array,
+    },
+    methods: {
+        force() {
+            this.$forceUpdate();
+        },
+        renderChildren() {
+            const children = this.$slots.default;
+            const body = this.$el.contentDocument.body;
+            const el = document.createElement('div'); // we will mount or nested app to this element
+            body.appendChild(el);
+
+            if (this.headers) {
+                if (this.headers.length > 0) {
+                    for (var header in this.headers) {
+                        this.$el.contentDocument.head.innerHTML += this.headers[
+                            header
+                        ];
+                    }
+                }
+            }
+
+            if (this.bodyClasses && this.bodyClasses.length) {
+                for (var _class in this.bodyClasses) {
+                    body.classList.add(this.bodyClasses[_class]);
+                }
+            }
+
+            if (this.css) {
+                const cssEl = document.createElement('STYLE');
+                cssEl.textContent = this.css;
+                this.$el.contentDocument.head.appendChild(cssEl);
+            }
+
+            const iApp = new Vue({
+                name: 'iApp',
+                //freezing to prevent unnessessary Reactifiation of vNodes
+                data: { children: Object.freeze(children) },
+                render(h) {
+                    return h('main', this.children);
+                },
+            });
+
+            iApp.$mount(el); // mount into iframe
+
+            this.iApp = iApp; // cache instance for later updates
+        },
+    },
+});
 
 Vue.mixin({
     computed: {
@@ -42,8 +137,11 @@ Vue.mixin({
             };
         },
         numberWithCommas() {
-            return (x) =>
-                x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ',');
+            return (x) => {
+                return x
+                    .toString()
+                    .replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ',');
+            };
         },
         formatdd2hns() {
             return (dd) => {
@@ -89,12 +187,17 @@ Vue.mixin({
         },
     },
     methods: {
-        decodePuny(_in) {
-            let out = punycode.toUnicode(_in);
-            if (_in === out) {
-                return `${_in}/`;
+        decodePuny(_in, emojiOnly = false) {
+            try {
+                let out = punycode.toUnicode(_in);
+                if (_in === out) {
+                    return `${_in}/`;
+                }
+                if (emojiOnly) return out;
+                return `${_in}/ (${out})`;
+            } catch {
+                return _in;
             }
-            return `${_in}/ (${out})`;
         },
         isDarkRadial(input, light, dark, ratio = 125) {
             // remove the hash
