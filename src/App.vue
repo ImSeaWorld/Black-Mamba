@@ -34,7 +34,7 @@
                                     hint="Namebase session stored in your browser"
                                     :rules="[ val => val && val.length > 0 || 'Something needs to go here!' ]"
                                 />
-                                    <q-checkbox :dark="false" class="text-grey-7" style="font-size: 1.2rem;user-select: none;" v-model="login.remember" label="Memba Me" />
+                                <q-checkbox :dark="false" class="text-grey-7" style="font-size: 1.2rem;user-select: none;" v-model="login.remember" label="Memba Me" />
                                 <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="nbLogin()"></q-btn>
                             </q-form>
                         </q-tab-panel>
@@ -69,6 +69,8 @@
                                     v-model="login._2fa"
                                 />
                                 
+                                <q-checkbox :dark="false" class="text-grey-7" style="font-size: 1.2rem;user-select: none;" v-model="login.local_remember" label="Memba Me" />
+
                                 <q-btn color="primary" label="Login" class="full-width q-mt-sm" @click="nbLogin()"></q-btn>
 
                             </q-form>
@@ -111,8 +113,6 @@
                     <span class="text-red" style="padding-left: 3px;font-weight: bold;">{{namebaseBids.lost.length}}</span>
                 </q-badge>
             </q-route-tab>
-            <!--q-route-tab to="/boyses" label="The Boyses" :disable="!login.loggedin" /-->
-            <q-route-tab to="/coin" label="The Coin Aye" :disable="!login.loggedin" />
             <q-route-tab to="/spa" label="SPA Builder" :disable="!login.loggedin" />
             <q-route-tab to="/log" label="Log" :disable="!login.loggedin" />
         </q-tabs>
@@ -248,6 +248,7 @@ export default {
                 loading: true,
                 loggedin: false,
                 remember: false,
+                local_remember: false,
                 email: '',
                 password: '',
                 _2fa: '',
@@ -316,13 +317,21 @@ export default {
         ]),
         nbLogin() {
             if (this.login.tab === 'local') {
-                this.$store.dispatch('LOCAL_LOGIN', {
-                    Email: this.login.email,
-                    Password: this.login.password,
-                    Token: this.login._2fa,
-                });
+                this.$store
+                    .dispatch('LOCAL_LOGIN', {
+                        Email: this.login.email,
+                        Password: this.login.password,
+                        Token: this.login._2fa,
+                    })
+                    .then((session) => {
+                        if (this.login.local_remember)
+                            this.$store.dispatch('SAVE_LOGIN', session);
+                    });
             } else {
-                this.$store.dispatch('LOGIN', this.login.session);
+                this.$store.dispatch(
+                    this.login.remember ? 'REMEMBER_LOGIN' : 'LOGIN',
+                    this.login.session,
+                );
             }
         },
         closeApplication() {
@@ -333,12 +342,10 @@ export default {
                 if (remote.BrowserWindow.getAllWindows()[0].isFocused()) {
                     if (this.$route.name != 'Auctions') {
                         this.$store.dispatch('GET_BIDS');
-                        //console.warn('GET_BIDS');
                     }
 
                     if (this.$route.name != 'Home') {
                         this.$store.dispatch('GET_DOMAINS');
-                        //console.warn('GET_DOMAINS');
                     }
                 }
 
@@ -362,24 +369,20 @@ export default {
         },
     },
     watch: {
-        domainsLength(to) {
-            //console.log(to);
-        },
         activeSession(to) {
             this.login.session = to;
             this.login.loggedin = !!to;
         },
-        clockedHns(to, fro) {
+        clockedHns(to) {
             this.account.lockedHns = to;
         },
-        chnsBalance(to, fro) {
+        chnsBalance(to) {
             this.account.hnsBalance = to;
         },
-        cusdBalance(to, fro) {
+        cusdBalance(to) {
             this.account.usdBalance = to;
         },
         namebaseStatus(to) {
-            //console.log('namebaseStatus:', to);
             if (this.login.loading) {
                 switch (to) {
                     case 'LOGGED_IN':

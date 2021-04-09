@@ -169,7 +169,7 @@ const actions = {
                     dispatch(GET_DOMAINS);
                     dispatch(GET_DASHBOARD);
                     dispatch(CONNECT);
-                    resolve();
+                    resolve(session);
                 }
             });
         });
