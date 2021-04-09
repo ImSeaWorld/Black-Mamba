@@ -1,6 +1,6 @@
 # Black Mamba - `1.3.2`
 
-Desktop application for [namebase.io](https://namebase.io).
+Desktop application for [namebase.io](https://namebase.io)!
 
 |                                                Library | Version |
 | -----------------------------------------------------: | :-----: |
@@ -10,7 +10,7 @@ Desktop application for [namebase.io](https://namebase.io).
 |   [CoinCapJS](https://github.com/ImSeaWorld/coincapjs) |  1.0.5  |
 | [NamebaseJS](https://github.com/ImSeaWorld/namebasejs) |  1.1.0  |
 
-Windows build is coming soon. I need to host it since it's massive!
+Download latest version here: https://github.com/ImSeaWorld/Black-Mamba/releases/
 
 At this point, this is no replacement for namebase. Functionality can be added to get it up to snuff but I mainly use it to look at how much I've spent and how much I have. This project has gotten bigger than itself and I'm open to PRs that add more functionality.
 
