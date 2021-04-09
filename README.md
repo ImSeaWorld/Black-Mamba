@@ -19,7 +19,7 @@ At this point, this is no replacement for namebase. Functionality can be added t
 -   Rework `Auctions` load handling. Right now it refreshing the whole collection.
 -   Rework `Auctions` table handling, `Marketplace`->`Power Search` is what it should look like.
 -   Add last purchase price of domain in `My Domains`, only getting final auction price.
--   Add bidding to `Auctions` ([ref](https://github.com/ImSeaWorld/namebasejs/blob/866a37f0279d34a52a1aa45afe1492d91fedc8a4/namebasejs/index.js#L309))
+-   Add bidding to `Auctions` ([ref](https://github.com/ImSeaWorld/namebasejs/blob/866a37f0279d34a52a1aa45afe1492d91fedc8a4/namebasejs/index.js#L423))
 -   Add failover for CoinCap
 
 #### Login Page
